@@ -56,4 +56,5 @@ and completions are cached in `<out>/cache.jsonl`, so `--resume` after a budget 
   That is the interesting question (does a better system prompt generalise across constraint *types*?),
   but expect small, noisy deltas; use `--holdout` ≥ 100 before believing a gain.
 - Small models (Nova Micro) score low on IFBench regardless of prompt; the checkers are unforgiving.
-- GEPA and MIPROv2 papers train on the *test* set. We don't; numbers are not comparable to theirs.
+- GEPA reports 36.9 → 38.6 (Qwen3-8B) and 47.8 → 56.0 (GPT-4.1 Mini) on IFBench - the smallest gain of
+  any benchmark in that paper. Expect the landscape to be flat; a stronger model shifts the level, not the slope.
