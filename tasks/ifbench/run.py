@@ -16,6 +16,7 @@ import os
 import re
 from pathlib import Path
 
+from bpto.gepa import gepa
 from bpto import (Budget, CompletionCache, EventLog, ModelConfig, Progress, Stop, Tree, evaluate, guided, lineage,
                   plot_tree, random, run, select, step, successive_halving, tree_text)
 
@@ -29,7 +30,7 @@ def _mock():
 
     def handler(prompt, cfg, schema):
         if schema is Variants:
-            n = int(re.search(r"Return (\d+) distinct", prompt).group(1))
+            n = int(re.search(r"(?:Return|write) (\d+) (?:distinct|improved)", prompt).group(1))
             base = re.search(r"<prompt>\n(.*?)\n</prompt>", prompt, re.S).group(1)
             words = base.split()
             return Variants(prompts=[" ".join(w for j, w in enumerate(words) if (j + i) % 4) for i in range(n)])
@@ -89,7 +90,15 @@ async def main(args):
     if not args.quiet:
         Progress(tree)
 
-    def schedule(tree, rnd):
+    if args.strategy == "gepa":
+        from .feedback import feedback as real_feedback
+        fb = (lambda ex, r: f"metrics: {r.metrics}") if args.mock else real_feedback
+        schedule = gepa(fb, minibatch=args.minibatch, parents_per_round=args.parents, n=args.n_guided,
+                        mode=args.mode, seed=args.seed)
+    else:
+        schedule = None
+
+    def tree_schedule(tree, rnd):
         parents = select.leaves if not tree.evaluated_nodes() else select.top_k(args.expand_k, among=select.unexpanded)
         return [
             step(random(n=args.n_random), parents),
@@ -98,7 +107,8 @@ async def main(args):
                  select.where(lambda n: n.origin.op == "random" and not n.evaluated, select.leaves)),
             *successive_halving([args.cheap_n, None], keep=0.5, seed=args.seed),
         ]
-    res = await run(tree, schedule, stop=Stop(rounds=args.rounds, no_improvement_rounds=3), checkpoint=ck)
+    res = await run(tree, schedule or tree_schedule, stop=Stop(rounds=args.rounds, no_improvement_rounds=args.patience),
+                    checkpoint=ck)
 
     best = tree.best()
     report = [repr(tree), f"stopped: {res.stopped_because}", f"usage: {client.usage}", "",
@@ -131,6 +141,12 @@ if __name__ == "__main__":
     ap.add_argument("--n-train", type=int, default=100)
     ap.add_argument("--cheap-n", type=int, default=10, help="examples for the first evaluation rung")
     ap.add_argument("--holdout", type=int, default=0, help="score root and best on this many held-out examples")
+    ap.add_argument("--strategy", choices=["tree", "gepa"], default="tree",
+                    help="tree: random+guided expansion with greedy top_k; gepa: Pareto pool + reflective mutation")
+    ap.add_argument("--minibatch", type=int, default=3, help="gepa: examples shown to the reflection model")
+    ap.add_argument("--parents", type=int, default=1, help="gepa: parents mutated per round (1 = sequential GEPA)")
+    ap.add_argument("--mode", choices=["weighted", "uniform", "best", "all"], default="weighted", help="gepa: parent sampling")
+    ap.add_argument("--patience", type=int, default=3, help="stop after this many rounds without improvement")
     ap.add_argument("--rounds", type=int, default=2)
     ap.add_argument("--n-random", type=int, default=3)
     ap.add_argument("--n-guided", type=int, default=2)

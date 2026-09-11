@@ -82,6 +82,35 @@ for _ in range(10):
 `BOSelector` fits `embedding(node) → value(node)` on every node with a value, ranks the
 candidates by acquisition, and returns the top k. The tree and ops never know BO exists.
 
+## Two selection strategies on one tree: BO and GEPA
+
+`bpto.bo` and `bpto.gepa` are peers. Both sit on top of the same tree, ops, cache and budget; they differ
+only in *which node gets expanded next* and *how its children are written*. That makes them directly
+comparable at equal rollouts, and lets one ingredient be swapped at a time.
+
+```python
+from bpto import Stop, run
+from bpto.gepa import gepa
+
+def feedback(example, result):            # task-specific text the reflection model reads
+    return f"expected {example.answer!r}, metrics {result.metrics}"
+
+res = await run(tree, gepa(feedback, minibatch=3, mode="weighted"), stop=Stop(rounds=30))
+```
+
+`gepa(...)` is a schedule: sample a parent from the Pareto pool (candidates that are best on at least one
+training example, dominated ones removed, drawn ∝ examples won) → `ReflectiveExpander` rewrites the prompt
+after reading a minibatch of the parent's outputs plus `feedback` → the child is evaluated on that
+minibatch → only if it beats its parent there does it get the full set and join the pool.
+`mode="weighted" | "uniform" | "best" | "all"` ablates the stochastic and Pareto parts; `BOSelector` can
+be dropped in as the parent selector (`among=pareto_pool`) or as a pre-screen on children.
+
+This is a deliberately simplified re-implementation of **GEPA** — Agrawal et al., 2025, *"GEPA: Reflective
+Prompt Evolution Can Outperform Reinforcement Learning"* ([arXiv:2507.19457](https://arxiv.org/abs/2507.19457),
+[github.com/gepa-ai/gepa](https://github.com/gepa-ai/gepa)). Single prompt, no module round-robin, no merge;
+the reflection minibatch is read back from the cache rather than re-run. Credit for the method is theirs;
+the simplifications and any resulting shortcomings are ours.
+
 ## Running a schedule with stop conditions, checkpoint and resume
 
 ```python
@@ -130,7 +159,8 @@ bpto/
   observe.py  EventLog (JSONL), Progress (stderr), tree_text / tree_dot / plot_tree / lineage
   select.py   leaves, unevaluated, unexpanded, depth, top_k, pareto, union
   value.py    DescendantValue (fixed generation), SubtreeValue (any depth, optional pipeline-only attribution)
-  bo/         BOSelector; GPR (numpy); EI / UCB / Thompson; Voyage / OpenAI-compatible / Hash embedders; config_features
+  bo/         BOSelector; GPR (numpy); EI / UCB / Thompson; Voyage / OpenAI / Azure / Bedrock / Hash embedders
+  gepa/       simplified GEPA: Pareto-pool selector (pareto_sample), ReflectiveExpander, gepa() schedule
 tasks/compression/   example downstream task (will move to its own repo) — see its README
 tasks/ifbench/        IFBench instruction-following task (real data, code checkers) — see its README
 ```

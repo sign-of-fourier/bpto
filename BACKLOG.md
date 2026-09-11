@@ -15,10 +15,9 @@ Where BO can go (one variable at a time):
 
 ## Steps
 
-1. **GEPA-ish baseline in user-space** (no `bpto/` changes): Pareto-pool selector over
-   `Evaluation.per_example` with ∝-wins sampling; feedback-aware `guided` for the task
-   (subclass `LLMExpander`, directive built from failed examples; parent's evaluation when the node is an
-   unevaluated `Pipeline` child; record inputs in `origin.params`); `successive_halving` as the minibatch gate.
+1. ~~**Simplified GEPA as a peer of `bpto.bo`**~~ — done (`bpto/gepa/`: `pareto_sample` with mode switch,
+   `ReflectiveExpander`, `gepa()` schedule with minibatch gate; task feedback in `tasks/*/feedback.py`;
+   `--strategy gepa` in `tasks/ifbench/run.py`). Not yet run live.
 2. **Synthetic ladder, offline, $0.** Extend the planted-optimum benchmark: arms = Pareto sampling /
    BO replaces (1) / BO within Pareto pool / Pareto + BO child-screen (2) / both. Anytime curves
    (best-so-far vs rollouts), 50 seeds, mean ± SE. Include the warm-up hybrid "Pareto until k expansions,

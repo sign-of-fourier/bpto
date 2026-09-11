@@ -24,6 +24,9 @@ python examples/smoke.py bedrock # LIVE, hard-capped at 12 calls (Budget). See "
 - **Scores are vectors.** `Scorer` -> per-example `Metrics` dict; `Objective(metrics, ctx)` ->
   `(scalar, feasible)` and is separate, cheap and re-runnable (constraints may depend on `ctx.depth`).
   Pareto is computed from the raw vectors. Don't collapse to a scalar inside a scorer.
+- **`bpto.bo` and `bpto.gepa` are peers on top of the tree** - selection/mutation strategies, nothing else.
+  GEPA is a deliberately simplified re-implementation (credited in README); its ingredients are switches
+  (`pareto_sample(mode=...)`) so BO can replace one at a time. Feedback text is task code (`tasks/*/feedback.py`).
 - **Ancestor attribution** is the BO target: `DescendantValue(generations=k, agg)` (fixed
   generation) or `SubtreeValue(agg)` (any depth). `BOSelector` is *only a selector*; the tree
   and ops never know BO exists.
