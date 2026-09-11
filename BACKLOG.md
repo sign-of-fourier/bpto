@@ -29,15 +29,12 @@ Where BO can go (one variable at a time):
    (tie by construction - see `experiments/2026-09-11-ifbench-gepa-vs-bo/`). Before re-running:
    fix the reflector (forced-structure prompt, temperature 1.0; Pro if still timid), and switch task.
 
-4b. **Compression as the comparison task (planned, not coded).** Constrained, continuation-style:
-   *minimise `template_tokens` subject to `f1 >= b(level)`*, with `b` loose at the root (e.g. root F1 - 0.10)
-   and rising a little per level (or every two levels) toward the root's F1 - the accuracy floor tightens
-   as prompts get shorter. Reflective mutator with a fixed succinctness directive ("shorter without losing
-   precision/recall") plus per-example feedback (missed / spurious names). Small train set (30) since a
-   full evaluation must be cheap; 100 held-out; ~600 rollouts per arm-seed; ~$0.30 for 2 arms x 5 seeds.
-   Open decisions: per-example objective for the Pareto pool (a per-example F1 floor is 0/1 - use raw
-   per-example F1 for pool membership and the constrained scalar for ranking?); whether `level` is tree
-   depth or rollouts spent (depth is not a progress measure for GEPA's pool); infeasible-node penalty.
+4b. ~~Compression comparison~~ built and run (`experiments/live_compare/compress.py`,
+   `experiments/2026-09-11-compression-gepa-vs-bo/`): tokens objective s.t. train F1 >= floor rising with
+   rollouts; BO 11.4 vs GEPA 17.2 tokens, not significant, BO loses more held-out F1. Next, in order:
+   (i) score all candidates on held-out and compare (tokens, held-out F1) fronts (~$0.25);
+   (ii) make parent choice matter - train 100 / stricter gate - then 10 seeds; (iii) penalty term so
+   infeasible nodes carry graded value for the surrogate.
 
 4c. **Equal-budget harness on Nova Micro**, same arms as step 2, ≥ 3 seeds, held-out ≥ 150, equal `Budget`
    per arm; rollouts on Micro, expansion via `Task.expander_client` on Nova Lite so the mutator is not the

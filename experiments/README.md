@@ -25,6 +25,7 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 | 2026-09-11 | [Synthetic ladder, 8 arms x 40 seeds x 6 conditions, $0](2026-09-11-synthetic-ladder/) | Pareto pool matters, stochastic sampling does not: greedy argmax within the pool beats GEPA's sampler everywhere except a deceptive landscape, where all tie. BO beats GEPA's sampler under noise (0.97 vs 0.86) and surrogate child pre-screening helps most with a weak mutator (0.91 vs 0.83); nothing beats greedy on additive landscapes. |
 
 | 2026-09-11 | [IFBench, GEPA vs BO, seed 0, 1,200 rollouts each, $0.16](2026-09-11-ifbench-gepa-vs-bo/) | Tie by construction: neither arm found a child beating the root on train (Lite reflections are paraphrases; Micro has no headroom on IFBench). Stopped before seeds 1-4. Several expander/budget bugs fixed. |
+| 2026-09-11 | [Compression, GEPA vs BO, annealed F1 floor, 5 seeds x 600 rollouts, $0.065](2026-09-11-compression-gepa-vs-bo/) | Both arms compress 97 -> 5-26 tokens within 0.05 train F1 of the root. BO shorter on average (11.4 vs 17.2 tokens, paired +5.8 ± 5.1, 2/5 wins) but with lower held-out F1 (0.936 vs 0.958): not significant, and the shortest-feasible readout rewards overfitting a 30-example floor. Mechanics (floor moves, re-scoring, "new best" when the floor crosses) verified live. |
 
 ## Standing conclusions
 
@@ -36,6 +37,10 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
   strategy. Nova Lite paraphrases; test a forced-structure prompt / Pro before comparing selectors again.
 - Synthetic ladder: the *weighting* in GEPA's sampler is what works; its randomness is not. BO's clearest
   contributions are robustness to evaluation noise and child pre-screening when the mutator is weak.
+- Compression maiden run: with a 30-example train set and a permissive 3-example gate, ~95% of rollouts go to
+  full evaluations of accepted children, leaving ~20 parent choices per run - too few for selection strategy
+  to show. Make selection expensive (bigger train set or stricter gate) before comparing selectors again, and
+  compare (tokens, held-out F1) fronts rather than the shortest train-feasible prompt.
 - Gains reported on low-baseline models (Nova Micro) do not transfer proportionally to stronger models:
   a restatement fixes "cheap" failures that an 8B model has already absorbed.
 - Reference points from the GEPA paper (Agrawal et al. 2025), Qwen3-8B, test accuracy %:
