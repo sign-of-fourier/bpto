@@ -110,12 +110,13 @@ class ModelClient(ABC):
             return hit.model_copy(update={"cached": True})
         if self.budget is not None:
             self.budget.check(self.usage)
+        self.usage.calls += 1  # reserve before awaiting, so concurrent in-flight calls count against the budget
         async with self._sem:
             t0 = time.perf_counter()
             comp = await self._complete(prompt, cfg, schema)
             comp.latency_s = time.perf_counter() - t0
         comp.model = comp.model or cfg.model
-        self.usage.add(Usage(input_tokens=comp.input_tokens, output_tokens=comp.output_tokens, calls=1))
+        self.usage.add(Usage(input_tokens=comp.input_tokens, output_tokens=comp.output_tokens))
         self.cache.put(key, comp)
         return comp
 

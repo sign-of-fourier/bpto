@@ -82,3 +82,13 @@ async def test_azure_embedder_url_and_headers():
     assert await e.embed(["a"]) == [[1.0]]
     assert seen["url"] == "https://x.openai.azure.com/openai/deployments/emb-3/embeddings?api-version=2024-10-21"
     assert seen["key"] == "k"
+
+
+async def test_budget_counts_in_flight_calls():
+    import asyncio
+    from bpto import Budget, BudgetExceeded, MockClient
+    client = MockClient(lambda p, c, s: "ok", delay=0.01, max_concurrency=50, budget=Budget(max_calls=5))
+    results = await asyncio.gather(*(client.complete(f"p{i}") for i in range(20)), return_exceptions=True)
+    ok = [r for r in results if not isinstance(r, Exception)]
+    assert len(ok) == 5 and client.usage.calls == 5
+    assert all(isinstance(r, BudgetExceeded) for r in results if isinstance(r, Exception))
