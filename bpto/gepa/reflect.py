@@ -45,9 +45,10 @@ class ReflectiveExpander(LLMExpander):
 
     def __init__(self, feedback: Feedback = default_feedback, minibatch: int = 3, n: int = 1, calls: int = 1,
                  seed: int | None = None, max_output_chars: int = 1500, meta_prompt: str | None = None,
-                 config: ModelConfig | None = None):
+                 config: ModelConfig | None = None, passed: Callable[[Example, ExampleResult], bool] | None = None):
         super().__init__(n=n, calls=calls, meta_prompt=meta_prompt or REFLECT_PROMPT, config=config)
         self.feedback, self.minibatch, self.seed, self.max_output_chars = feedback, minibatch, seed, max_output_chars
+        self.passed = passed  # which traces count as successes (failures are shown first); default: objective >= 1
 
     def source(self, tree: Tree, node: Node) -> Node | None:
         """The node whose traces are used: itself if evaluated, else the nearest evaluated ancestor."""
@@ -65,7 +66,7 @@ class ReflectiveExpander(LLMExpander):
         rnd = _random.Random((self.seed or 0) ^ int(node.id, 16))  # deterministic per node: no shared state
         rnd.shuffle(rows)
         # failures first - they carry the information; successes fill the remaining slots
-        rows.sort(key=lambda er: self._passed(tree, er[0], er[1]))
+        rows.sort(key=lambda er: self.passed(er[0], er[1]) if self.passed else self._passed(tree, er[0], er[1]))
         return src, rows[: self.minibatch]
 
     @staticmethod

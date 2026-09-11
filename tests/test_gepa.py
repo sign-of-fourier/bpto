@@ -151,3 +151,35 @@ async def test_gepa_rejects_children_that_do_not_improve():
     assert [n.id for n in candidates(tree)] == [tree.root.id]
     assert sum(1 for n in tree.nodes.values() if n.depth > 0) == 3       # one child per round, all rejected
     assert all(n.parent_id == tree.root.id for n in tree.nodes.values() if n.depth > 0)
+
+
+def test_pool_on_raw_metric_ignores_constrained_scalar():
+    """A constrained 'minimise tokens' objective gives every example the same scalar; `metric=` restores per-example info."""
+    from bpto import ConstrainedObjective
+    tree = Tree(make_task(lambda p, c, s: Out(answer="")))
+    tree.task.objective = ConstrainedObjective(LinearObjective(tokens=-1.0), metric="accuracy", bound=0.5, sense=">=")
+    fake_eval(tree, tree.root, {"e0"})
+    a = fake_eval(tree, tree.add_child(tree.root, "A {q}", Origin(op="x")), {"e1", "e2"})
+    for n in (tree.root, a):
+        for r in n.evaluation.per_example:
+            r.metrics["tokens"] = 10.0
+    assert set(example_scores(tree, a).values()) == {-10.0}                     # scalar carries nothing per example
+    assert example_scores(tree, a, "accuracy") == {"e0": 0.0, "e1": 1.0, "e2": 1.0, "e3": 0.0}
+    pool, wins = pareto_pool(tree, metric="accuracy")
+    assert wins == {tree.root.id: 1, a.id: 2}
+    assert len(pareto_sample(1, mode="weighted", seed=0, metric="accuracy")(tree)) == 1
+
+
+async def test_reflective_expander_passed_hook_orders_failures_first():
+    seen = {}
+
+    def handler(prompt, cfg, schema):
+        if schema is Variants:
+            seen["prompt"] = prompt
+            return Variants(prompts=["Reply to {q}"])
+        return Out(answer="")
+    tree = Tree(make_task(handler))
+    fake_eval(tree, tree.root, {"e0", "e1", "e2"})     # objective says e3 failed...
+    exp = ReflectiveExpander(minibatch=1, passed=lambda ex, r: ex.id != "e1")   # ...but the task says e1 is the failure
+    await exp.apply(tree, [tree.root])
+    assert "q: q1" in seen["prompt"] and "q: q3" not in seen["prompt"]

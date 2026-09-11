@@ -28,7 +28,7 @@ def _mock_client():
 
     def handler(prompt, cfg, schema):
         if schema is Variants:
-            n = int(re.search(r"(?:Return|write) (\d+) (?:distinct|improved)", prompt).group(1))
+            n = int(re.search(r"(?:Return|write) (\d+) (?:distinct|improved|shorter)", prompt).group(1))
             base = re.search(r"<prompt>\n(.*?)\n</prompt>", prompt, re.S).group(1)
             words = base.split()
             return Variants(prompts=[" ".join(w for j, w in enumerate(words) if (j + i) % 3) for i in range(n)])
