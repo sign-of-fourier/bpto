@@ -25,7 +25,21 @@ Where BO can go (one variable at a time):
    then BO". If BO does not beat the Pareto sampler here, stop and rethink.
 3. **Live embedder smoke**: `BedrockEmbedder` (Titan V2) on ≤ 10 texts; then one BO-selected round on the
    compression task with a small cap.
-4. **Equal-budget harness on Nova Micro**, same arms as step 2, ≥ 3 seeds, held-out ≥ 150, equal `Budget`
+4. ~~Equal-budget harness~~ built (`experiments/live_compare/compare.py`); IFBench run stopped after seed 0
+   (tie by construction - see `experiments/2026-09-11-ifbench-gepa-vs-bo/`). Before re-running:
+   fix the reflector (forced-structure prompt, temperature 1.0; Pro if still timid), and switch task.
+
+4b. **Compression as the comparison task (planned, not coded).** Constrained, continuation-style:
+   *minimise `template_tokens` subject to `f1 >= b(level)`*, with `b` loose at the root (e.g. root F1 - 0.10)
+   and rising a little per level (or every two levels) toward the root's F1 - the accuracy floor tightens
+   as prompts get shorter. Reflective mutator with a fixed succinctness directive ("shorter without losing
+   precision/recall") plus per-example feedback (missed / spurious names). Small train set (30) since a
+   full evaluation must be cheap; 100 held-out; ~600 rollouts per arm-seed; ~$0.30 for 2 arms x 5 seeds.
+   Open decisions: per-example objective for the Pareto pool (a per-example F1 floor is 0/1 - use raw
+   per-example F1 for pool membership and the constrained scalar for ranking?); whether `level` is tree
+   depth or rollouts spent (depth is not a progress measure for GEPA's pool); infeasible-node penalty.
+
+4c. **Equal-budget harness on Nova Micro**, same arms as step 2, ≥ 3 seeds, held-out ≥ 150, equal `Budget`
    per arm; rollouts on Micro, expansion via `Task.expander_client` on Nova Lite so the mutator is not the
    ceiling. Tasks: compression first (real objective landscape, cheap), then HotpotQA-distractor
    (`tasks/hotpotqa/`, `{question, context}` → answer, EM + F1; ~1.5–2k input tokens/example).
