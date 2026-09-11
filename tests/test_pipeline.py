@@ -47,3 +47,16 @@ async def test_expander_config_override(task):
     await tree.apply(guided("x", n=1, config=ModelConfig(temperature=1.0)), select=select.root)
     assert seen[0].temperature == 1.0
     assert tree.leaves[0].origin.params["config"] == {"temperature": 1.0}
+
+
+async def test_expander_drops_invented_placeholders_and_strips_wrappers(task):
+    from bpto import MockClient, Tree, select
+    from bpto.ops import Variants, random
+    def handler(prompt, cfg, schema):
+        return Variants(prompts=["<prompt>\nGood {text}\n</prompt>", "```\n<prompt>Also good {text}</prompt>\n```",
+                                 "Bad {text} {invented: x}", "Missing placeholder", "Unbalanced {text"])
+    task.client = task.expander_client = MockClient(handler)
+    tree = Tree(task)
+    kids = await tree.apply(random(n=5), select.root)
+    assert [k.prompt.template for k in kids] == ["Good {text}", "Also good {text}"]
+    assert kids[0].origin is not kids[1].origin   # per-child origin

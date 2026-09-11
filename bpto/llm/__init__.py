@@ -1,8 +1,8 @@
-from .base import Budget, BudgetExceeded, Completion, ModelClient, ModelConfig, Usage
+from .base import PRICES, Budget, BudgetExceeded, Completion, ModelClient, ModelConfig, Usage, price_for
 from .cache import CompletionCache
 from .mock import MockClient
 
-__all__ = ["Budget", "BudgetExceeded", "Completion", "ModelClient", "ModelConfig", "Usage",
+__all__ = ["PRICES", "price_for", "Budget", "BudgetExceeded", "Completion", "ModelClient", "ModelConfig", "Usage",
            "CompletionCache", "MockClient", "AnthropicClient", "OpenAICompatibleClient", "BedrockClient"]
 
 

@@ -101,9 +101,10 @@ class BedrockEmbedder:
     single-input), run in threads and bounded by `max_concurrency`; results are cached per text."""
 
     def __init__(self, model: str = "amazon.titan-embed-text-v2:0", region: str | None = None, *,
-                 profile: str | None = None, dimensions: int = 256, normalize: bool = True, max_concurrency: int = 8):
+                 profile: str | None = None, dimensions: int = 256, normalize: bool = True, max_concurrency: int = 8,
+                 budget=None):
         import boto3
-        self.model, self.dimensions, self.normalize = model, dimensions, normalize
+        self.model, self.dimensions, self.normalize, self.budget = model, dimensions, normalize, budget
         self._rt = boto3.Session(profile_name=profile, region_name=region).client("bedrock-runtime")
         self._sem = asyncio.Semaphore(max_concurrency)
         self._cache: dict[str, list[float]] = {}
@@ -112,10 +113,15 @@ class BedrockEmbedder:
     def _one_sync(self, text: str) -> list[float]:
         body = json.dumps({"inputText": text, "dimensions": self.dimensions, "normalize": self.normalize})
         resp = self._rt.invoke_model(modelId=self.model, body=body, contentType="application/json", accept="application/json")
-        return json.loads(resp["body"].read())["embedding"]
+        data = json.loads(resp["body"].read())
+        if self.budget is not None:
+            self.budget.charge(self.model, int(data.get("inputTextTokenCount", 0)), 0)
+        return data["embedding"]
 
     async def _one(self, text: str) -> list[float]:
         async with self._sem:
+            if self.budget is not None:
+                self.budget.check(self.budget.spent)
             self.calls += 1
             return await asyncio.to_thread(self._one_sync, text)
 

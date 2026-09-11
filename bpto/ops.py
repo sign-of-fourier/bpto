@@ -6,6 +6,7 @@ class so a 10k-node evaluate never schedules 10k x |dataset| tasks at once.
 from __future__ import annotations
 
 import asyncio
+import re
 import logging
 from abc import ABC, abstractmethod
 from typing import Any
@@ -60,11 +61,22 @@ class Expander(Op):
     async def propose(self, tree: Tree, node: Node) -> list[Prompt]: ...
 
     async def run_one(self, tree: Tree, node: Node) -> list[Node]:
-        origin = Origin(op=self.name, params=self.params())
-        children = [tree.add_child(node, p, origin) for p in await self.propose(tree, node)]
+        # a fresh Origin per child: params are per-node state (analysis tags), not shared across siblings
+        children = [tree.add_child(node, p, Origin(op=self.name, params=self.params())) for p in await self.propose(tree, node)]
         node.state = NodeState.EXPANDED
         tree._emit("expanded", node)
         return children
+
+
+_WRAP = re.compile(r"^\s*(?:```[a-z]*\s*)?(?:<prompt>\s*)+|(?:\s*</prompt>)+(?:\s*```)?\s*$")
+
+
+def _strip_wrappers(t: str) -> str:
+    """Models copy the <prompt> delimiters (and code fences) from the meta-prompt; peel them off."""
+    prev = None
+    while prev != t:
+        prev, t = t, _WRAP.sub("", t).strip()
+    return t
 
 
 class LLMExpander(Expander):
@@ -115,9 +127,15 @@ class LLMExpander(Expander):
         out, seen = [], {node.prompt.template}
         for c in comps:
             for t in c.parsed_as(Variants).prompts:
-                p = Prompt(template=t.strip())
-                if t in seen or not required.issubset(p.placeholders):
-                    log.debug("dropping variant (dup or missing placeholders): %r", t[:80])
+                t = _strip_wrappers(t)
+                try:
+                    p = Prompt(template=t)
+                    found = set(p.placeholders)
+                except ValueError:  # unbalanced braces
+                    found = None
+                # exactly the original placeholders: a missing one can't be rendered, an invented one crashes render
+                if t in seen or found != required:
+                    log.debug("dropping variant (dup / placeholder mismatch): %r", t[:80])
                     continue
                 seen.add(t); out.append(p)
         return out[: self.n * self.calls]

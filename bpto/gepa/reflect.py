@@ -25,8 +25,9 @@ REFLECT_PROMPT = (
     "{directive}\n"
     "Read the feedback carefully. Identify what the prompt is missing or getting wrong: any task-specific "
     "rules, edge cases, formatting requirements or strategies that would have fixed the failures, while "
-    "keeping what already works. Then write {n} improved prompt template(s). Each must be complete and "
-    "usable on its own.{seed}"
+    "keeping what already works. Make substantive changes - add concrete rules, a step-by-step strategy, "
+    "or brief examples of the kinds of requirement that were missed; do not merely rephrase. Then write "
+    "{n} improved prompt template(s). Each must be complete and usable on its own.{seed}"
 )
 
 
@@ -98,9 +99,8 @@ class ReflectiveExpander(LLMExpander):
 
     async def run_one(self, tree: Tree, node: Node) -> list[Node]:
         src, rows = self.pick(tree, node)
-        origin = Origin(op=self.name, params={**self.params(), "source": src.id if src else None,
-                                              "minibatch_ids": [ex.id for ex, _ in rows]})
-        children = [tree.add_child(node, p, origin) for p in await self.propose(tree, node)]
+        params = {**self.params(), "source": src.id if src else None, "minibatch_ids": [ex.id for ex, _ in rows]}
+        children = [tree.add_child(node, p, Origin(op=self.name, params=dict(params))) for p in await self.propose(tree, node)]
         node.state = NodeState.EXPANDED
         tree._emit("expanded", node)
         return children

@@ -61,18 +61,61 @@ class BudgetExceeded(RuntimeError):
     pass
 
 
+# $ per 1M tokens (input, output). On-demand list prices as of 2026-09; verify before relying on them.
+PRICES: dict[str, tuple[float, float]] = {
+    "amazon.nova-micro-v1:0": (0.035, 0.14),
+    "amazon.nova-lite-v1:0": (0.06, 0.24),
+    "amazon.nova-pro-v1:0": (0.80, 3.20),
+    "amazon.titan-embed-text-v2:0": (0.02, 0.0),
+    "claude-opus-5": (5.0, 25.0),
+    "claude-sonnet-5": (3.0, 15.0),
+    "claude-haiku-4-5-20251001": (1.0, 5.0),
+}
+
+
+def price_for(model: str, prices: dict[str, tuple[float, float]] | None = None) -> tuple[float, float]:
+    table = {**PRICES, **(prices or {})}
+    for key in (model, model.split("/")[-1], ".".join(model.split(".")[1:])):  # "us.amazon.nova-micro-v1:0" -> table key
+        if key in table:
+            return table[key]
+    raise KeyError(f"no price known for model {model!r}; pass prices={{...}} to Budget")
+
+
 class Budget(BaseModel):
+    """Hard stop on spend. Share one instance across clients/embedders for a global cap: each call is
+    checked before it starts and charged when it returns, so `spent_usd` is the whole run's bill."""
     max_calls: int | None = None
     max_input_tokens: int | None = None
     max_output_tokens: int | None = None
+    max_usd: float | None = None
+    prices: dict[str, tuple[float, float]] = Field(default_factory=dict)
+    spent: Usage = Field(default_factory=Usage)
+    spent_usd: float = 0.0
+    parent: "Budget | None" = None  # a local cap (e.g. max_calls per run) that also charges a shared meter
 
     def check(self, usage: Usage) -> None:
+        if self.parent is not None:
+            self.parent.check(self.parent.spent)
         if self.max_calls is not None and usage.calls >= self.max_calls:
             raise BudgetExceeded(f"calls {usage.calls} >= {self.max_calls}")
         if self.max_input_tokens is not None and usage.input_tokens >= self.max_input_tokens:
             raise BudgetExceeded(f"input tokens {usage.input_tokens} >= {self.max_input_tokens}")
         if self.max_output_tokens is not None and usage.output_tokens >= self.max_output_tokens:
             raise BudgetExceeded(f"output tokens {usage.output_tokens} >= {self.max_output_tokens}")
+        if self.max_usd is not None and self.spent_usd >= self.max_usd:
+            raise BudgetExceeded(f"spent ${self.spent_usd:.4f} >= ${self.max_usd:.2f}")
+
+    def charge(self, model: str, input_tokens: int, output_tokens: int) -> float:
+        """Record a completed call. Raises KeyError for an unpriced model when a $ cap is set."""
+        self.spent.add(Usage(input_tokens=input_tokens, output_tokens=output_tokens, calls=1))
+        if self.parent is not None:
+            self.parent.charge(model, input_tokens, output_tokens)
+        if self.max_usd is None and not self.prices and model not in PRICES:
+            return 0.0
+        pin, pout = price_for(model, self.prices)
+        cost = (input_tokens * pin + output_tokens * pout) / 1e6
+        self.spent_usd += cost
+        return cost
 
 
 class ModelClient(ABC):
@@ -117,6 +160,8 @@ class ModelClient(ABC):
             comp.latency_s = time.perf_counter() - t0
         comp.model = comp.model or cfg.model
         self.usage.add(Usage(input_tokens=comp.input_tokens, output_tokens=comp.output_tokens))
+        if self.budget is not None:
+            self.budget.charge(cfg.model, comp.input_tokens, comp.output_tokens)
         self.cache.put(key, comp)
         return comp
 

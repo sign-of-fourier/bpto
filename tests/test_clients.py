@@ -1,3 +1,4 @@
+import pytest
 import json
 
 import httpx
@@ -92,3 +93,38 @@ async def test_budget_counts_in_flight_calls():
     ok = [r for r in results if not isinstance(r, Exception)]
     assert len(ok) == 5 and client.usage.calls == 5
     assert all(isinstance(r, BudgetExceeded) for r in results if isinstance(r, Exception))
+
+
+async def test_shared_dollar_budget_across_clients():
+    import asyncio
+    from bpto import Budget, BudgetExceeded, MockClient, ModelConfig
+    from bpto.llm.mock import MockClient as MC
+    budget = Budget(max_usd=0.001, prices={"mock-a": (1.0, 1.0), "mock-b": (100.0, 100.0)})  # $ per 1M tokens
+    a = MC(lambda p, c, s: "x " * 50, default_config=ModelConfig(model="mock-a"), budget=budget)
+    b = MC(lambda p, c, s: "x " * 50, default_config=ModelConfig(model="mock-b"), budget=budget)
+    for i in range(5):
+        await a.complete(f"a{i}")
+    assert 0 < budget.spent_usd < 0.001 and budget.spent.calls == 5
+    with pytest.raises(BudgetExceeded):
+        for i in range(50):
+            await b.complete(f"b{i}")
+    assert budget.spent_usd >= 0.001 and a.usage.calls == 5 and b.usage.calls < 50
+
+
+def test_price_lookup_handles_region_prefix():
+    from bpto.llm import price_for
+    assert price_for("us.amazon.nova-micro-v1:0") == price_for("amazon.nova-micro-v1:0")
+    with pytest.raises(KeyError):
+        price_for("nobody-knows-this-model")
+
+
+async def test_budget_parent_meter():
+    from bpto import Budget, BudgetExceeded, ModelConfig
+    from bpto.llm.mock import MockClient as MC
+    shared = Budget(max_usd=1.0, prices={"m": (1.0, 1.0)})
+    local = Budget(max_calls=2, parent=shared)
+    c = MC(lambda p, c, s: "hi", default_config=ModelConfig(model="m"), budget=local)
+    await c.complete("a"); await c.complete("b")
+    with pytest.raises(BudgetExceeded):
+        await c.complete("c")
+    assert shared.spent.calls == 2 and shared.spent_usd > 0 and local.spent.calls == 2
