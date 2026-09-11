@@ -1,3 +1,4 @@
+import pytest
 from bpto import DescendantValue, ModelConfig, NodeState, Pipeline, SubtreeValue, Tree, evaluate, guided, random, select
 from bpto.bo import GPR, EI, BOSelector, HashEmbedder
 
@@ -60,3 +61,15 @@ async def test_expander_drops_invented_placeholders_and_strips_wrappers(task):
     kids = await tree.apply(random(n=5), select.root)
     assert [k.prompt.template for k in kids] == ["Good {text}", "Also good {text}"]
     assert kids[0].origin is not kids[1].origin   # per-child origin
+
+
+async def test_malformed_expansion_yields_no_children(task):
+    from bpto import Budget, BudgetExceeded, MockClient, Tree, select
+    from bpto.ops import random
+    task.client = task.expander_client = MockClient(lambda p, c, s: "not json at all")
+    tree = Tree(task)
+    kids = await tree.apply(random(n=2), select.root)
+    assert kids == [] and tree.root.state == "expanded"
+    task.expander_client = MockClient(lambda p, c, s: "x", budget=Budget(max_calls=0))
+    with pytest.raises(BudgetExceeded):
+        await tree.apply(random(n=2), select.root)

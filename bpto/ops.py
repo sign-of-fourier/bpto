@@ -122,10 +122,15 @@ class LLMExpander(Expander):
         comps = await asyncio.gather(*(
             task.expander_client.complete(self.render_meta(tree, node, i), config=cfg, schema=Variants)
             for i in range(self.calls)
-        ))
+        ), return_exceptions=True)
         required = set(node.prompt.placeholders)
         out, seen = [], {node.prompt.template}
         for c in comps:
+            if isinstance(c, BudgetExceeded):
+                raise c
+            if isinstance(c, BaseException):  # malformed structured output etc.: this expansion yields nothing
+                log.warning("expansion of node %s failed: %s: %s", node.id, type(c).__name__, str(c)[:200])
+                continue
             for t in c.parsed_as(Variants).prompts:
                 t = _strip_wrappers(t)
                 try:
