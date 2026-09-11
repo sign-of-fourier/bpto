@@ -55,6 +55,13 @@ as `AWS_BEARER_TOKEN_BEDROCK` (the name boto3 reads natively; no remapping neede
 Working model: `us.amazon.nova-micro-v1:0`, region `us-east-1` (pass it explicitly; `~/.aws/config`
 defaults to us-east-2). There is no Anthropic API key on this machine.
 
+## Where things go
+
+- `BACKLOG.md` - ordered next steps; keep it current when scope changes.
+- `experiments/` - committed findings: one dir per run (NOTES.md, report, tree.txt, evaluations.jsonl,
+  plot) plus `experiments/README.md` as the index of findings and standing conclusions. `runs/` holds the
+  heavy, gitignored artifacts (cache, tree.json, events). After any live run, add both.
+
 ## Known gaps / caveats
 
 - Mock-run plots (`--mock`) are plumbing checks only; the mock "model" is a regex.

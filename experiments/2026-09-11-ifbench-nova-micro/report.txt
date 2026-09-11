@@ -1,0 +1,17 @@
+Tree(nodes=26, depth=4, evaluated=26)
+stopped: rounds=2
+usage: input_tokens=0 output_tokens=0 calls=0 cache_hits=0
+
+train  root: {'inst_loose': 0.4875, 'inst_strict': 0.4625, 'loose': 0.45, 'output_tokens': 154.35, 'strict': 0.425, 'template_tokens': 104.0}
+train  best: {'inst_loose': 0.4875, 'inst_strict': 0.4875, 'loose': 0.45, 'output_tokens': 150.65, 'strict': 0.45, 'template_tokens': 97.0}
+
+Your role is to assist accurately. Below is the user's request, which comes with particular formatting or content rules (e.g., word count restrictions, mandatory keywords, structural demands). Follow each constraint exactly as stated, even if it leads to an unconventional answer. Do not explain the constraints or state that you are adhering to them; just provide the response.
+
+Request:
+{instruction}
+
+lineage of best:
++0.425 [root] You are a careful assistant. Read the request below and respond to it. The reque…
+  +0.450 [random] Your role is to assist accurately. Below is the user's request, which comes with…
+
+held-out (40 examples): {'root': {'inst_loose': 0.287, 'inst_strict': 0.237, 'loose': 0.225, 'output_tokens': 182.775, 'strict': 0.175, 'template_tokens': 104.0}, 'best': {'inst_loose': 0.338, 'inst_strict': 0.3, 'loose': 0.275, 'output_tokens': 178.45, 'strict': 0.25, 'template_tokens': 97.0}}
