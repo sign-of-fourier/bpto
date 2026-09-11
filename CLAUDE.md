@@ -9,6 +9,7 @@ Python 3.12, async, Pydantic v2. Library in `bpto/`; downstream example task in 
 pip install -e .                 # required once so examples/ and tasks/ can import bpto
 python -m pytest -q              # all tests are offline (MockClient / httpx.MockTransport / fake boto3)
 python -m tasks.compression.run --mock --rounds 4     # offline end-to-end run -> runs/compression/
+python -m tasks.ifbench.run --mock --rounds 2         # same for IFBench (real checkers need `pip install -e vendor/IFBench`)
 python examples/smoke.py bedrock # LIVE, hard-capped at 12 calls (Budget). See "Live runs".
 ```
 
@@ -57,9 +58,11 @@ defaults to us-east-2). There is no Anthropic API key on this machine.
 ## Known gaps / caveats
 
 - Mock-run plots (`--mock`) are plumbing checks only; the mock "model" is a regex.
-- No real dataset yet: `tasks/compression` uses `generate_dataset()` (synthetic). Real data goes in
-  as JSONL `{"inputs": {"text": ...}, "answer": [...]}` via `load(path)`.
+- `tasks/compression` uses `generate_dataset()` (synthetic). `tasks/ifbench` is real data (300 rows,
+  `tasks/ifbench/data/ifbench_test.jsonl`); its checkers come from github.com/allenai/IFBench, which is
+  not on PyPI - clone to `vendor/` (gitignored) and `pip install -e` it. Tests skip if absent.
 - `OpenAICompatibleClient.count_tokens` is a chars/4 estimate (no standard endpoint).
 - Resume is step-granular: an interrupted step re-runs; safe for `evaluate` (cached) and for
   expansion under `leaves`/`unexpanded`, not under a custom selector that ignores node state.
-- `VoyageEmbedder` / `AzureOpenAIEmbedder` / `AnthropicClient` are untested against live endpoints.
+- `VoyageEmbedder` / `AzureOpenAIEmbedder` / `BedrockEmbedder` / `AnthropicClient` are untested live.
+  No embedding model has been used live yet; BO runs so far used `HashEmbedder`.

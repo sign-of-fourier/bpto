@@ -211,7 +211,8 @@ class evaluate(Op):
             log.warning("example %s on node %s failed: %s", ex.id, node.id, e)
             return ExampleResult(example_id=ex.id, output="", metrics={}, error=f"{type(e).__name__}: {e}")
 
-    async def run_one(self, tree: Tree, node: Node) -> list[Node]:
+    async def score(self, tree: Tree, node: Node) -> Evaluation:
+        """Evaluate without storing - e.g. a one-off held-out pass that must not replace the training result."""
         data = self._data(tree)
         results = await asyncio.gather(*(self._one_example(tree, node, ex) for ex in data))
         rows = [r.metrics for r in results if r.error is None]
@@ -221,9 +222,11 @@ class evaluate(Op):
             agg = {k: v * len(rows) / len(results) for k, v in agg.items()}
         ctx = ObjectiveContext(depth=node.depth, n_evaluated=len(tree.evaluated_nodes()))
         score, feasible = tree.task.objective(agg, ctx)
-        node.evaluation = Evaluation(per_example=results, metrics=agg, metrics_std=std_metrics(rows),
-                                     n=len(results), score=score, feasible=feasible,
-                                     dataset_ids=[ex.id for ex in data])
+        return Evaluation(per_example=results, metrics=agg, metrics_std=std_metrics(rows),
+                          n=len(results), score=score, feasible=feasible, dataset_ids=[ex.id for ex in data])
+
+    async def run_one(self, tree: Tree, node: Node) -> list[Node]:
+        node.evaluation = await self.score(tree, node)
         if node.state == NodeState.PROPOSED:
             node.state = NodeState.EVALUATED
         tree._emit("evaluated", node)

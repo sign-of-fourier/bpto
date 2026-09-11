@@ -132,6 +132,7 @@ bpto/
   value.py    DescendantValue (fixed generation), SubtreeValue (any depth, optional pipeline-only attribution)
   bo/         BOSelector; GPR (numpy); EI / UCB / Thompson; Voyage / OpenAI-compatible / Hash embedders; config_features
 tasks/compression/   example downstream task (will move to its own repo) — see its README
+tasks/ifbench/        IFBench instruction-following task (real data, code checkers) — see its README
 ```
 
 Tests: `python -m pytest -q`. Real-API smoke test: `examples/names.py`.

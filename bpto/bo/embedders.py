@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hashlib
+import json
 import math
 import os
 import re
@@ -93,3 +94,33 @@ class HashEmbedder:
 
     async def embed(self, texts: Sequence[str]) -> list[list[float]]:
         return [self._one(t) for t in texts]
+
+
+class BedrockEmbedder:
+    """Amazon Titan Text Embeddings (v2) via boto3 `invoke_model`. One request per text (the API is
+    single-input), run in threads and bounded by `max_concurrency`; results are cached per text."""
+
+    def __init__(self, model: str = "amazon.titan-embed-text-v2:0", region: str | None = None, *,
+                 profile: str | None = None, dimensions: int = 256, normalize: bool = True, max_concurrency: int = 8):
+        import boto3
+        self.model, self.dimensions, self.normalize = model, dimensions, normalize
+        self._rt = boto3.Session(profile_name=profile, region_name=region).client("bedrock-runtime")
+        self._sem = asyncio.Semaphore(max_concurrency)
+        self._cache: dict[str, list[float]] = {}
+        self.calls = 0
+
+    def _one_sync(self, text: str) -> list[float]:
+        body = json.dumps({"inputText": text, "dimensions": self.dimensions, "normalize": self.normalize})
+        resp = self._rt.invoke_model(modelId=self.model, body=body, contentType="application/json", accept="application/json")
+        return json.loads(resp["body"].read())["embedding"]
+
+    async def _one(self, text: str) -> list[float]:
+        async with self._sem:
+            self.calls += 1
+            return await asyncio.to_thread(self._one_sync, text)
+
+    async def embed(self, texts: Sequence[str]) -> list[list[float]]:
+        todo = [t for t in dict.fromkeys(texts) if t not in self._cache]
+        for t, v in zip(todo, await asyncio.gather(*(self._one(t) for t in todo))):
+            self._cache[t] = v
+        return [self._cache[t] for t in texts]

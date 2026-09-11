@@ -13,11 +13,11 @@ from ..select import Selector, unexpanded
 from ..tree import Node, Tree
 from ..value import Value, best_grandchild
 from .acquisition import EI, UCB, Mean, Thompson
-from .embedders import AzureOpenAIEmbedder, HashEmbedder, HTTPEmbedder, OpenAIEmbedder, VoyageEmbedder
+from .embedders import AzureOpenAIEmbedder, BedrockEmbedder, HashEmbedder, HTTPEmbedder, OpenAIEmbedder, VoyageEmbedder
 from .gpr import GPR
 
 __all__ = ["BOSelector", "Embedder", "Surrogate", "Acquisition", "EI", "UCB", "Thompson", "Mean", "GPR",
-           "AzureOpenAIEmbedder", "HashEmbedder", "HTTPEmbedder", "OpenAIEmbedder", "VoyageEmbedder", "config_features"]
+           "AzureOpenAIEmbedder", "BedrockEmbedder", "HashEmbedder", "HTTPEmbedder", "OpenAIEmbedder", "VoyageEmbedder", "config_features"]
 
 
 class Embedder(Protocol):
