@@ -22,6 +22,7 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 | 2026-09-10 | Synthetic BO benchmark (`tests/test_bo.py` setup, 20 seeds, HashEmbedder + GPR + EI) | BO finds the planted optimum in 1.45 rounds vs 7.35 for random selection. Synthetic landscape only. |
 | 2026-09-11 | Bedrock Nova Micro smoke (`examples/smoke.py`, 10 calls, names task) | Provider path works; Nova echoes JSON schemas -> client-side balanced-brace extraction. |
 | 2026-09-11 | [IFBench, Nova Micro, greedy top_k, 802 calls](2026-09-11-ifbench-nova-micro/) | strict 0.175 -> 0.250 held-out (n=40, inside noise). Best node is a depth-1 restatement; deeper expansion added nothing. |
+| 2026-09-11 | [Synthetic ladder, 8 arms x 40 seeds x 6 conditions, $0](2026-09-11-synthetic-ladder/) | Pareto pool matters, stochastic sampling does not: greedy argmax within the pool beats GEPA's sampler everywhere except a deceptive landscape, where all tie. BO beats GEPA's sampler under noise (0.97 vs 0.86) and surrogate child pre-screening helps most with a weak mutator (0.91 vs 0.83); nothing beats greedy on additive landscapes. |
 
 ## Standing conclusions
 
@@ -29,6 +30,8 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
   +8 on GPT-4.1 Mini; MIPROv2 ~0). With 300 rows, a +2 pt effect is undetectable. Use it as a plumbing /
   flat-landscape stress test, not as the benchmark that decides between BO and GEPA-style selection.
 - No live run has yet exercised `BOSelector` or a real embedder; all BO evidence is synthetic.
+- Synthetic ladder: the *weighting* in GEPA's sampler is what works; its randomness is not. BO's clearest
+  contributions are robustness to evaluation noise and child pre-screening when the mutator is weak.
 - Gains reported on low-baseline models (Nova Micro) do not transfer proportionally to stronger models:
   a restatement fixes "cheap" failures that an 8B model has already absorbed.
 - Reference points from the GEPA paper (Agrawal et al. 2025), Qwen3-8B, test accuracy %:
