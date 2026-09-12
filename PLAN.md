@@ -20,6 +20,16 @@ our `y` is re-scored whenever the accuracy floor moves, so we simply resend it.
    - `X` = embeddings of nodes with `value(node) is not None`; `y` = those values (higher = better; our
      values are already "gain", so no negation); `candidates` = embeddings of the nodes passed in;
      `q` = min(q, len(candidates)). Returns the `q` nodes by `index`.
+   - **PCA client-side before sending** (service owner's guidance): the service fits a Matérn-5/2 ARD GP on
+     the raw columns - 256 lengthscales from ~20 rows is under-determined. Project Titan's 256 dims to
+     `MODAL_BO_PCA_DIMS` (8-16) with a PCA fit on the candidate pool, apply the same projection to `X`.
+     Refit per request (stateless, cheap). Apply the same PCA to the local-GPR arm so the two BO arms differ
+     only in joint-vs-sequential batch selection.
+   - Pass `seed` per request once the service has the field (owner offered to add it; we want it - runs are
+     otherwise not replayable because batch sampling is unseeded). Until then, log that runs are not replayable.
+   - `X` and `candidates` overlapping fully (candidates = all evaluated nodes) is fine: posterior variance at
+     observed points is the noise floor, so re-expansion is chosen only when the noise term says it might win.
+   - q=4 from 20-50 candidates is the direct-EI path (every sampled batch scored, no prefilter) - cheap.
    - Fewer than ~5 training rows: fall back to the caller-supplied warm-up selector (GEPA sampler), as
      the harness already does for the local GPR.
    - Records `mu`/`sigma` per returned node in `tree.meta["bo_fits"]` for analysis, not decisions.
@@ -27,8 +37,9 @@ our `y` is re-scored whenever the accuracy floor moves, so we simply resend it.
    - Same object serves both roles: parent choice (`value=best_children_gain`) and child pre-screen
      (`value=own gain`), two instances, two calls per round.
 2. Tests: `tests/test_remote_bo.py` with a fake `urllib`/httpx transport returning canned indices; assert
-   request shape (same column count in `X` and `candidates`, `y` length, `q`), fallback below 5 rows,
-   retry-once on timeout. No network.
+   request shape (same column count in `X` and `candidates` after PCA, `y` length, `q`), fallback below 5
+   rows, retry-once on timeout. No network. For a one-off live check use `mode="debug"` (returns
+   `mu_all`/`sigma_all`) to assert on the model, not just the indices.
 3. Nothing else in `bpto/` changes. `BOSelector` (local GPR) stays as the sequential baseline.
 
 ## What changes in the harness (`experiments/live_compare/compress.py`)
@@ -57,13 +68,16 @@ our `y` is re-scored whenever the accuracy floor moves, so we simply resend it.
   region, *and* not worse than bo-local-q4 (joint batch >= sequential top-q). If bo-local-q4 == bo-service,
   the batch mechanism is not where the value is.
 
-## Open questions for the service owner (from `CLIENT_GUIDE.md`: "ask; do not guess")
+## Answers from the service owner (2026-09-12)
 
-- 256-dim Titan embeddings with 15-40 training rows: does the service project / learn features, or fit
-  in the raw space? (Our local GPR fits raw; same regime.)
-- Randomness: is there a seed field? Without one runs are not exactly replayable (acceptable, noted).
-- Is calling it twice per round with different `X`/`y` (parent model vs child model) the intended usage?
-- Egress from this machine to the Modal URL (not yet verified).
+- High-dim: raw-column ARD GP, no projection - **PCA client-side to 8-16 dims**, fit on the candidate pool
+  (what the other consumers do). Folded into step 1 above.
+- Reproducibility: not today (unseeded batch sampling); a `seed` field is a small addition - **requested**.
+- Latency: as read; cold start is per idle scale-down of the container, not per client process.
+- Two calls per round with different `X`/`y`: intended usage; every request is an independent fit.
+- Testing: plain JSON; `mode="debug"` returns `mu_all`/`sigma_all`.
+- Three arms (gepa-q / bo-local-q / bo-service-q) and the 3-children control: confirmed as the right design.
+- Still to verify: egress from this machine to the Modal URL.
 
 ## Follow-ups that stay in the backlog
 
