@@ -26,6 +26,7 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 
 | 2026-09-11 | [IFBench, GEPA vs BO, seed 0, 1,200 rollouts each, $0.16](2026-09-11-ifbench-gepa-vs-bo/) | Tie by construction: neither arm found a child beating the root on train (Lite reflections are paraphrases; Micro has no headroom on IFBench). Stopped before seeds 1-4. Several expander/budget bugs fixed. |
 | 2026-09-11 | [Compression, GEPA vs BO, annealed F1 floor, 5 seeds x 600 rollouts, $0.065](2026-09-11-compression-gepa-vs-bo/) | Both arms compress 97 -> 5-26 tokens within 0.05 train F1 of the root. BO shorter on average (11.4 vs 17.2 tokens, paired +5.8 ± 5.1, 2/5 wins) but with lower held-out F1 (0.936 vs 0.958): not significant, and the shortest-feasible readout rewards overfitting a 30-example floor. Mechanics (floor moves, re-scoring, "new best" when the floor crosses) verified live. |
+| 2026-09-12 | [Compression v2, 12 seeds x 2,000 rollouts, train 100, minibatch 5, $0.41](2026-09-12-compression-v2-gepa-vs-bo/) | **Readout is the front graph.** BO's pooled (tokens, F1) front lies left of GEPA's at every accuracy level; per seed, at the accuracy the floor targeted (root - 0.05..0.10) BO is 3.5 tokens shorter (±2.0, 8-9/12 seeds). At stricter bars GEPA's pool hedges better because BO's value ignores accurate-but-not-shorter children. BO wasted 35% of rollouts on non-advancing full evals vs GEPA's 49%. |
 
 ## Standing conclusions
 
@@ -41,6 +42,10 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
   full evaluations of accepted children, leaving ~20 parent choices per run - too few for selection strategy
   to show. Make selection expensive (bigger train set or stricter gate) before comparing selectors again, and
   compare (tokens, held-out F1) fronts rather than the shortest train-feasible prompt.
+- Compression v2 (first result where selection had real decisions): acquisition + surrogate child screen beat
+  Pareto-weighted sampling at the targeted accuracy; a threshold-tied scalar value leaves the rest of the
+  front to chance, which the Pareto pool covers for free. Next BO value: front/hypervolume gain. Report
+  constrained comparisons as the full front graph, never one row.
 - Gains reported on low-baseline models (Nova Micro) do not transfer proportionally to stronger models:
   a restatement fixes "cheap" failures that an 8B model has already absorbed.
 - Reference points from the GEPA paper (Agrawal et al. 2025), Qwen3-8B, test accuracy %:

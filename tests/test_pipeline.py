@@ -73,3 +73,13 @@ async def test_malformed_expansion_yields_no_children(task):
     task.expander_client = MockClient(lambda p, c, s: "x", budget=Budget(max_calls=0))
     with pytest.raises(BudgetExceeded):
         await tree.apply(random(n=2), select.root)
+
+
+def test_positional_placeholders_are_rejected():
+    """A model-written template with a bare `{}` must fail at construction, not at render (IndexError mid-run)."""
+    import pytest
+    from bpto import Prompt
+    for t in ["Names: {}\n{text}", "Names {0} {text}"]:
+        with pytest.raises(ValueError):
+            Prompt(template=t).placeholders
+    assert Prompt(template="a {{b}} {text}").placeholders == ("text",)

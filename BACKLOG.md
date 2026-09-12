@@ -29,12 +29,14 @@ Where BO can go (one variable at a time):
    (tie by construction - see `experiments/2026-09-11-ifbench-gepa-vs-bo/`). Before re-running:
    fix the reflector (forced-structure prompt, temperature 1.0; Pro if still timid), and switch task.
 
-4b. ~~Compression comparison~~ built and run (`experiments/live_compare/compress.py`,
-   `experiments/2026-09-11-compression-gepa-vs-bo/`): tokens objective s.t. train F1 >= floor rising with
-   rollouts; BO 11.4 vs GEPA 17.2 tokens, not significant, BO loses more held-out F1. Next, in order:
-   (i) score all candidates on held-out and compare (tokens, held-out F1) fronts (~$0.25);
-   (ii) make parent choice matter - train 100 / stricter gate - then 10 seeds; (iii) penalty term so
-   infeasible nodes carry graded value for the surrogate.
+4b. ~~Compression comparison~~ two runs done: maiden (`experiments/2026-09-11-compression-gepa-vs-bo/`)
+   and v2 (`experiments/2026-09-12-compression-v2-gepa-vs-bo/`, 12 seeds x 2,000 rollouts, train 100,
+   minibatch 5). BO 3.5 tokens shorter at the targeted accuracy (8-9/12 seeds), GEPA better at stricter
+   bars the search was not aimed at. Readout = front graph (`front_plot.py`). Next, in order:
+   (i) front-aware BO value (hypervolume / EI over the front), same harness and seeds (~$0.40);
+   (ii) real extraction data (CoNLL-2003 PER or Few-NERD person) into `tasks/compression/data/`;
+   (iii) held-out fronts (score all candidates on held-out, ~$0.20); (iv) parallel arm-seeds in the harness;
+   (v) Bedrock retry on transient `ResourceNotFoundException`.
 
 4c. **Equal-budget harness on Nova Micro**, same arms as step 2, ≥ 3 seeds, held-out ≥ 150, equal `Budget`
    per arm; rollouts on Micro, expansion via `Task.expander_client` on Nova Lite so the mutator is not the
