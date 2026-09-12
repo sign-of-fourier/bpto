@@ -22,7 +22,8 @@ our `y` is re-scored whenever the accuracy floor moves, so we simply resend it.
      `q` = min(q, len(candidates)). Returns the `q` nodes by `index`.
    - **PCA client-side before sending** (service owner's guidance): the service fits a Matérn-5/2 ARD GP on
      the raw columns - 256 lengthscales from ~20 rows is under-determined. Project Titan's 256 dims to
-     `MODAL_BO_PCA_DIMS` (8-16) with a PCA fit on the candidate pool, apply the same projection to `X`.
+     `MODAL_BO_PCA_DIMS` (8-16; the ARD GP needs rows >> dims, and at ~20 rows even 16 is generous) with a
+     PCA fit on the **pooled rows, evaluated ∪ candidates**, then project both `X` and `candidates` with it.
      Refit per request (stateless, cheap). Apply the same PCA to the local-GPR arm so the two BO arms differ
      only in joint-vs-sequential batch selection.
    - Pass `seed` per request once the service has the field (owner offered to add it; we want it - runs are
@@ -67,6 +68,13 @@ our `y` is re-scored whenever the accuracy floor moves, so we simply resend it.
 - Success = bo-service-q4 front left of gepa-q4 with the ±2 SE band clear of zero over the targeted
   region, *and* not worse than bo-local-q4 (joint batch >= sequential top-q). If bo-local-q4 == bo-service,
   the batch mechanism is not where the value is.
+
+## Side experiment: PCA dimension k
+
+Nobody has measured the right k for this service; the ads consumers use a rule of thumb. On whichever
+dataset is chosen, run the bo-service arm at k ∈ {4, 8, 16, 32} (same seeds, same everything else) and read
+the fronts. Cheap (~$0.20 per k at v2 prices), and the first real measurement in the project. Do it after
+the main three-arm comparison, with k fixed at 8 for that.
 
 ## Answers from the service owner (2026-09-12)
 
