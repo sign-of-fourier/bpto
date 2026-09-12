@@ -57,6 +57,17 @@ ranges 0.967-1.0, so the y-axis is a slightly different yardstick per point.)
   rejects 30-55% of children (was 10-20%), so selection had ~20 real decisions per run and the surrogate
   pre-screen is where BO's edge shows: fewer wasted full evaluations.
 
+## Caveats
+
+- **Reflector-call asymmetry.** Rollouts (task-model calls) are equal, but BO proposes 3 children per round
+  to GEPA's 1, so it makes ~3x the Nova Lite reflection calls (not counted as rollouts, ~$0.006 per run).
+  Cheap proposals / expensive evaluation is the pre-screen's design, but part of BO's edge may be "more
+  proposals" rather than "the surrogate picked well". Control to run: GEPA with 3 children, keep 1 at random.
+- Train-split pooling: the pooled front mixes 12 splits (root F1 0.967-1.0); the per-seed/mean graphs
+  are the ones with a consistent yardstick.
+- Held-out was measured only for the root and the final best of each run, not for every candidate.
+- Synthetic data: Micro reaches train F1 1.0 at 11 tokens; the constraint binds only below ~15 tokens.
+
 ## What it says about the hypothesis
 
 "Fitness is not the same as being a good generator of children": at the target the search was given, an

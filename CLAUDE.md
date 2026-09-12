@@ -60,7 +60,8 @@ defaults to us-east-2). There is no Anthropic API key on this machine.
 
 ## Where things go
 
-- `BACKLOG.md` - ordered next steps; keep it current when scope changes.
+- `BACKLOG.md` - ordered next steps; keep it current when scope changes. `PLAN.md` - the detailed plan for
+  the item at the top of the backlog (currently: parallel BO via the batch-suggestion service, `CLIENT_GUIDE.md`).
 - `experiments/` - committed findings: one dir per run (NOTES.md, report, tree.txt, evaluations.jsonl,
   plot) plus `experiments/README.md` as the index of findings and standing conclusions. `runs/` holds the
   heavy, gitignored artifacts (cache, tree.json, events). After any live run, add both.
@@ -74,5 +75,7 @@ defaults to us-east-2). There is no Anthropic API key on this machine.
 - `OpenAICompatibleClient.count_tokens` is a chars/4 estimate (no standard endpoint).
 - Resume is step-granular: an interrupted step re-runs; safe for `evaluate` (cached) and for
   expansion under `leaves`/`unexpanded`, not under a custom selector that ignores node state.
-- `VoyageEmbedder` / `AzureOpenAIEmbedder` / `BedrockEmbedder` / `AnthropicClient` are untested live.
-  No embedding model has been used live yet; BO runs so far used `HashEmbedder`.
+- `VoyageEmbedder` / `AzureOpenAIEmbedder` / `AnthropicClient` are untested live. `BedrockEmbedder`
+  (Titan V2) is used live in every BO arm.
+- Bedrock occasionally returns a transient `ResourceNotFoundException: Inference Profile ARN not found` on a
+  single call; it is recorded as a failed example (score 0), not retried.

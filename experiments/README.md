@@ -45,7 +45,8 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 - Compression v2 (first result where selection had real decisions): acquisition + surrogate child screen beat
   Pareto-weighted sampling at the targeted accuracy; a threshold-tied scalar value leaves the rest of the
   front to chance, which the Pareto pool covers for free. Next BO value: front/hypervolume gain. Report
-  constrained comparisons as the full front graph, never one row.
+  constrained comparisons as the full front graph, never one row. Caveat: BO makes ~3x the reflector
+  calls (3 children/round vs 1); the `gepa + 3 children, random keep-1` control is not yet run.
 - Gains reported on low-baseline models (Nova Micro) do not transfer proportionally to stronger models:
   a restatement fixes "cheap" failures that an 8B model has already absorbed.
 - Reference points from the GEPA paper (Agrawal et al. 2025), Qwen3-8B, test accuracy %:

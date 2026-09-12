@@ -15,6 +15,12 @@ Where BO can go (one variable at a time):
 
 ## Steps
 
+0. **Parallel BO via the batch-suggestion service (`CLIENT_GUIDE.md`) - NEXT.** Plan in `PLAN.md`. Replace
+   `BOSelector`'s in-process GPR+EI with the remote joint-batch API (`q` parents per round, `q` children
+   kept for minibatches), same tree/ops. Three arms at equal rollouts: gepa-q (Pareto sample q parents),
+   bo-local-q (sequential top-q), bo-service-q (joint batch). Dataset to be chosen by the user (synthetic
+   compression is nearly saturated; see 4b(ii)). Also add the `gepa + 3 children, random keep-1` control
+   that isolates "more proposals" from "surrogate picks" (BO currently makes ~3x the reflector calls).
 1. ~~**Simplified GEPA as a peer of `bpto.bo`**~~ — done (`bpto/gepa/`: `pareto_sample` with mode switch,
    `ReflectiveExpander`, `gepa()` schedule with minibatch gate; task feedback in `tasks/*/feedback.py`;
    `--strategy gepa` in `tasks/ifbench/run.py`). Not yet run live.
@@ -23,8 +29,7 @@ Where BO can go (one variable at a time):
    BO replaces (1) / BO within Pareto pool / Pareto + BO child-screen (2) / both. Anytime curves
    (best-so-far vs rollouts), 50 seeds, mean ± SE. Include the warm-up hybrid "Pareto until k expansions,
    then BO". If BO does not beat the Pareto sampler here, stop and rethink.
-3. **Live embedder smoke**: `BedrockEmbedder` (Titan V2) on ≤ 10 texts; then one BO-selected round on the
-   compression task with a small cap.
+3. ~~Live embedder smoke~~ done: `BedrockEmbedder` (Titan V2) used live in every BO arm since 2026-09-11.
 4. ~~Equal-budget harness~~ built (`experiments/live_compare/compare.py`); IFBench run stopped after seed 0
    (tie by construction - see `experiments/2026-09-11-ifbench-gepa-vs-bo/`). Before re-running:
    fix the reflector (forced-structure prompt, temperature 1.0; Pro if still timid), and switch task.
