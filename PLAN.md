@@ -77,7 +77,7 @@ our `y` is re-scored whenever the accuracy floor moves, so we simply resend it.
 - Two calls per round with different `X`/`y`: intended usage; every request is an independent fit.
 - Testing: plain JSON; `mode="debug"` returns `mu_all`/`sigma_all`.
 - Three arms (gepa-q / bo-local-q / bo-service-q) and the 3-children control: confirmed as the right design.
-- Still to verify: egress from this machine to the Modal URL.
+- Egress verified 2026-09-12 (toy 3-d request, 32 s cold, correct shape; response also carries `ei_score`). URL in `.env` as `MODAL_BO_API_URL`.
 
 ## Follow-ups that stay in the backlog
 
