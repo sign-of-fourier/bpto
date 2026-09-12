@@ -8,6 +8,13 @@ reads the shortest prompt at that bar off the graph; an empty region means the s
 
 ![fronts](fronts.png)
 
+`fronts_mean.png` is the same information averaged: at each accuracy bar (train F1 >= root - gap, gap 0..0.20)
+the shortest prompt each seed found, mean ± 1 SE over 12 seeds, and the paired gepa-bo difference with
+±1/±2 SE bands. The crossover is at gap ≈ 0.03: below it GEPA (bands overlap up to ~0.01), above it BO by
+3-5 tokens with the ±2 SE band clear of zero from gap 0.06 on.
+
+![mean fronts](fronts_mean.png)
+
 ## Setup (what changed vs the maiden run in bold)
 
 - `tasks/compression` synthetic passages (`generate_dataset(340, seed=0)`); per seed **100 train** / 200 held-out.
