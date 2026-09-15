@@ -284,7 +284,7 @@ async def main(args):
     if (out / "results.jsonl").exists():
         done = {(r["arm"], r["seed"]) for r in map(json.loads, open(out / "results.jsonl"))}
     try:
-        for seed in range(args.seeds):
+        for seed in range(args.seed_start, args.seeds):
             for arm in args.arms:
                 if (arm, seed) in done:
                     continue
@@ -301,7 +301,8 @@ async def main(args):
 if __name__ == "__main__":
     ap = argparse.ArgumentParser()
     ap.add_argument("--arms", nargs="*", default=ARMS)
-    ap.add_argument("--seeds", type=int, default=3)
+    ap.add_argument("--seeds", type=int, default=3, help="run seeds [seed_start, seeds)")
+    ap.add_argument("--seed-start", type=int, default=0, help="first seed (parallel processes take disjoint ranges)")
     ap.add_argument("--rollouts", type=int, default=3000, help="task-model calls per arm-seed (search only)")
     ap.add_argument("--n-train", type=int, default=200)
     ap.add_argument("--holdout", type=int, default=300)
