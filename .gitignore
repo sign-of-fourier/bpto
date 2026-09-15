@@ -7,3 +7,9 @@ smoke_events.jsonl
 tree.json
 cache.jsonl
 vendor/
+
+# local working notes, not part of the repo
+CLAUDE.md
+PLAN.md
+BACKLOG.md
+CLIENT_GUIDE.md

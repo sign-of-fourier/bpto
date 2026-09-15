@@ -10,7 +10,7 @@ Compare **Bayesian optimization over a prompt tree** (bpto: embeddings + GPR + a
 which node to expand, with ancestor attribution as the training target) against **GEPA-style search**
 (evolutionary dynamics + a per-example Pareto pool as the sample-efficiency mechanism), with the same
 mutation operators available to both - including feedback-aware rewrites, which are a user-space pattern
-on top of bpto (see BACKLOG.md). The comparison is *selection strategy at equal rollout budget*.
+on top of bpto. The comparison is *selection strategy at equal rollout budget*.
 
 **Rollout** = one unique (prompt, example) model call, i.e. `client.usage.calls` with the cache on. The GEPA
 arm reads its reflection minibatch from the parent's cached evaluation, so it is not charged twice for it.
