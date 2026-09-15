@@ -69,6 +69,7 @@ class Expander(Op):
 
 
 _WRAP = re.compile(r"^\s*(?:```[a-z]*\s*)?(?:<prompt>\s*)+|(?:\s*</prompt>)+(?:\s*```)?\s*$")
+_TAG = re.compile(r"</?prompt>")
 
 
 def _strip_wrappers(t: str) -> str:
@@ -77,6 +78,12 @@ def _strip_wrappers(t: str) -> str:
     while prev != t:
         prev, t = t, _WRAP.sub("", t).strip()
     return t
+
+
+def _split_variants(t: str) -> list[str]:
+    """A single returned string sometimes holds several templates glued with <prompt> tags (Nova Lite does
+    this); left intact it would render every placeholder several times. Split on the tags."""
+    return [s for s in (_strip_wrappers(x) for x in _TAG.split(t)) if s]
 
 
 class LLMExpander(Expander):
@@ -131,15 +138,16 @@ class LLMExpander(Expander):
             if isinstance(c, BaseException):  # malformed structured output etc.: this expansion yields nothing
                 log.warning("expansion of node %s failed: %s: %s", node.id, type(c).__name__, str(c)[:200])
                 continue
-            for t in c.parsed_as(Variants).prompts:
-                t = _strip_wrappers(t)
+            for t in (v for raw in c.parsed_as(Variants).prompts for v in _split_variants(raw)):
                 try:
                     p = Prompt(template=t)
                     found = set(p.placeholders)
+                    once = all(len(re.findall(r"\{%s\}" % re.escape(f), t)) == 1 for f in found)
                 except ValueError:  # unbalanced braces
-                    found = None
-                # exactly the original placeholders: a missing one can't be rendered, an invented one crashes render
-                if t in seen or found != required:
+                    found, once = None, False
+                # exactly the original placeholders, each exactly once: a missing one can't be rendered, an
+                # invented one crashes render, a repeated one silently multiplies the input
+                if t in seen or found != required or not once:
                     log.debug("dropping variant (dup / placeholder mismatch): %r", t[:80])
                     continue
                 seen.add(t); out.append(p)

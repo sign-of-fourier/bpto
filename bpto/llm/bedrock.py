@@ -56,14 +56,22 @@ def _json_objects(text: str):
     return reversed(spans)
 
 
+def _validate(cand: str, schema: type[BaseModel]) -> BaseModel:
+    try:
+        return schema.model_validate_json(cand)
+    except Exception:
+        # Nova writes raw newlines inside JSON strings (invalid JSON); the stdlib parser accepts them non-strictly
+        return schema.model_validate(json.loads(cand, strict=False))
+
+
 def parse_json_reply(text: str, schema: type[BaseModel]) -> BaseModel:
     t = _FENCE.sub("", text.strip())
     try:
-        return schema.model_validate_json(t)
+        return _validate(t, schema)
     except Exception as first:
         for cand in _json_objects(t):
             try:
-                return schema.model_validate_json(cand)
+                return _validate(cand, schema)
             except Exception:
                 continue
         raise first

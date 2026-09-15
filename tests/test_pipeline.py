@@ -83,3 +83,17 @@ def test_positional_placeholders_are_rejected():
         with pytest.raises(ValueError):
             Prompt(template=t).placeholders
     assert Prompt(template="a {{b}} {text}").placeholders == ("text",)
+
+
+def test_expander_splits_glued_templates_and_rejects_repeated_placeholders():
+    import asyncio
+    from bpto import Dataset, MockClient, Task, Tree, exact_match, select
+    from bpto.ops import LLMExpander, Variants
+
+    def handler(prompt, cfg, schema):
+        return Variants(prompts=["A {x}\n<prompt>\nB {x}\n</prompt>", "C {x} and again {x}", "<prompt>D {x}</prompt>"])
+    task = Task(root="root {x}", dataset=Dataset.from_records([{"inputs": {"x": 1}, "answer": 1}]), scorer=exact_match(),
+                objective=lambda m, c: (0.0, True), client=MockClient(handler))
+    tree = Tree(task)
+    kids = asyncio.run(tree.apply(LLMExpander(n=4), select.root))
+    assert [k.prompt.template for k in kids] == ["A {x}", "B {x}", "D {x}"]

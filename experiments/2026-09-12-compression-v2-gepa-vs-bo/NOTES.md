@@ -15,6 +15,16 @@ the shortest prompt each seed found, mean ± 1 SE over 12 seeds, and the paired 
 
 ![mean fronts](fronts_mean.png)
 
+`trajectory.png` (added 2026-09-15, `trajectory_plot.py`) shows *where each optimizer was at each point of its
+budget*: the incumbent (shortest feasible prompt) as a step function of rollouts, mean ± 1 SE over the 12 seeds
+(left) and per seed (right), with the floor schedule in the panel below. It is not monotone: a floor raise can
+knock the incumbent infeasible and the curve jumps back up (the sawtooth in several gepa seeds at ~1,000 and
+~1,800 rollouts). The arms track each other for the first ~500 rollouts (loose floor, both find 20-30 token
+prompts fast); BO pulls ahead from ~600 and keeps improving to the end (12 tokens at 2,000), while GEPA's mean
+plateaus at ~16 from ~900 on and drifts up with the last floor raises.
+
+![trajectory](trajectory.png)
+
 ## Setup (what changed vs the maiden run in bold)
 
 - `tasks/compression` synthetic passages (`generate_dataset(340, seed=0)`); per seed **100 train** / 200 held-out.

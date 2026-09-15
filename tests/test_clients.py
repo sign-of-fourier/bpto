@@ -128,3 +128,13 @@ async def test_budget_parent_meter():
     with pytest.raises(BudgetExceeded):
         await c.complete("c")
     assert shared.spent.calls == 2 and shared.spent_usd > 0 and local.spent.calls == 2
+
+
+def test_bedrock_parse_accepts_raw_newlines_in_strings():
+    from pydantic import BaseModel
+    from bpto.llm.bedrock import parse_json_reply
+
+    class V(BaseModel):
+        prompts: list[str]
+    out = parse_json_reply('Sure:\n{"prompts": ["line one\nline two {x}", "b"]}', V)
+    assert out.prompts[0] == "line one\nline two {x}"
