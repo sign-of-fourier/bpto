@@ -30,6 +30,8 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 
 | 2026-09-15/16 | [HotpotQA-distractor, GEPA vs BO (+ 0-shot MIPRO), 3 seeds x 3,000 rollouts, $6.5](2026-09-15-hotpotqa-phase1/) | **Flat.** After fixing a glued-template artefact (a doubled `{context}` was worth +2-9 pts held-out) and pinning evaluation to temperature 0: gepa Δheld -0.004 ± 0.003, bo -0.003 ± 0.003, best = root in 3/6 runs; 0-shot MIPRO 0/16 above root; hand variants within 3 pts of root. Nova Micro is nondeterministic even at temperature 0 (F1 differs on 6-11% of rows between identical evaluations). Stopped at the 25% pause both times. |
 
+| 2026-09-16 | [HotpotQA two-stage program (searched selector, fixed answerer), GEPA vs BO, 3 seeds x 4,000 calls, $1.9](2026-09-16-hotpotqa-program/) | **The mechanism moves when the prompt controls a decision.** gepa raised held-out selection recall +6 pts in 2/3 seeds (first out-of-sample movement on HotpotQA); held-out F1 +.010 ± .019 (one +4.6, one 0, one −1.8). bo −.014 ± .006, 0/3, no smaller train-held gap (H3 falsified). In every run, the F1-chosen incumbent lost held-out iff its recall fell: selection ran on the noisier of two signals. Open: recall in the objective, program-valued nodes, surrogate noise. |
+
 ## Standing conclusions
 
 - IFBench is a flat landscape for prompt search at every model size published (GEPA: +1.7 on Qwen3-8B,
@@ -51,8 +53,10 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
   calls (3 children/round vs 1); the `gepa + 3 children, random keep-1` control is not yet run.
 - Gains reported on low-baseline models (Nova Micro) do not transfer proportionally to stronger models:
   a restatement fixes "cheap" failures that an 8B model has already absorbed.
-- HotpotQA-distractor on Nova Micro is flat, like IFBench: root F1 ~0.72, six hand-written variants within 3 pts,
-  reflective search (gepa, bo) and 0-shot MIPRO all tie it on held-out. Always run the $0.15 hand-variant pilot
+- HotpotQA-distractor on Nova Micro is flat *as a single prompt*: root F1 ~0.72, six hand-written variants within 3 pts,
+  reflective search (gepa, bo) and 0-shot MIPRO all tie it on held-out. As a two-stage program (searched paragraph
+  selector, fixed answerer) the same reflector moves held-out selection recall +6 pts: the flatness was the task, not
+  the mutator. Pick tasks where the searched prompt controls a decision a later stage consumes, or a tradeoff. Always run the $0.15 hand-variant pilot
   (at temperature 0) and the 25% pause before a full comparison.
 - All live runs before 2026-09-16 evaluated at Nova's default temperature 0.7 (nothing was sent). Now pinned to 0 -
   but Bedrock Nova Micro is still nondeterministic at 0 (F1 differs on 6-11% of rows between identical evaluations,
@@ -63,3 +67,7 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 - Reference points from the GEPA paper (Agrawal et al. 2025), Qwen3-8B, test accuracy %:
   HotpotQA 42.3 -> 62.3, IFBench 36.9 -> 38.6, HoVer 35.3 -> 52.3, PUPA 80.8 -> 91.9 (GEPA, <= 7k rollouts);
   MIPROv2 (BO-family): 55.3 / 36.2 / 47.3 / 81.6. Tasks with headroom: HotpotQA, HoVer, PUPA.
+- BO has not yet shown noise-robustness live (program run: 0/3, gap no smaller than gepa's). Its GP is fit on single
+  noisy measurements with `noise=None`; the synthetic-ladder noise result assumed a known noise level. Fix before the next
+  BO vs GEPA claim on a noisy metric. bpto nodes are single prompts; GEPA's are programs - a multi-module comparison needs
+  program-valued nodes and a per-module (concatenated / additive-kernel) embedding, untested.
