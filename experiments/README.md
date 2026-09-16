@@ -32,7 +32,23 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 
 | 2026-09-16 | [HotpotQA two-stage program (searched selector, fixed answerer), GEPA vs BO, 3 seeds x 4,000 calls, $1.9](2026-09-16-hotpotqa-program/) | **The mechanism moves when the prompt controls a decision.** gepa raised held-out selection recall +6 pts in 2/3 seeds (first out-of-sample movement on HotpotQA); held-out F1 +.010 ± .019 (one +4.6, one 0, one −1.8). bo −.014 ± .006, 0/3, no smaller train-held gap (H3 falsified). In every run, the F1-chosen incumbent lost held-out iff its recall fell: selection ran on the noisier of two signals. Open: recall in the objective, program-valued nodes, surrogate noise. |
 
+| 2026-09-16 | [Two-module synthetic ladder, $0](2026-09-16-synthetic-ladder-2mod/) | Gate for program-valued BO: `AdditiveGPR` (RBF per module, summed) + per-node noise + full-posterior EI reaches the target in 241 rollouts vs 340 for GEPA round-robin (both 100%), concat-RBF 0.854; holds with an interaction term (224 vs 249). **EI on the module component alone is a dead end (0.64)** - it ignores the modules the child keeps. Per-node noise helps the additive GP and hurts the single RBF. |
+| 2026-09-16 | [HotpotQA two-module program (selector + answerer searched), GEPA round-robin vs additive-kernel BO, 3 seeds x 4,000 calls, $1.38](2026-09-16-hotpotqa-two-module/) | **Searching the answerer on Micro is wasted budget.** gepa held ΔF1 −.009 ± .009 (worse than its selector-only +.010; recall no longer moved), bo +.001 ± .012 with one clean win (seed 1: +2.4 F1, +4.7 recall). 0/6 incumbents carry a substantive answerer rewrite. Recombination = best-found in 1/3. Diagnostics exposed a bo-arm defect present in every earlier live bo arm: EI's incumbent was the max raw target, so one 5-row 1.0 froze parent selection (seed 0: one parent 291/345 times). Fixed after the run; bo rows are pre-fix. |
+
+| 2026-09-16 | [HotpotQA selector program, BO without the minibatch, 3 seeds, $0.80](2026-09-16-hotpotqa-bo-pure/) | **First bo arm not below zero.** GP trains on full evaluations only, PIT targets, EI incumbent = best posterior expectation, parent value = own score (the descendant target locked EI onto one parent: ladder 0.50 vs 0.995). Held ΔF1 +.019 ± .016 (gepa same seeds +.010 ± .019), held selection recall up in 3/3 seeds (+.029 ± .008 vs gepa ± .035). Ladder: beats gepa-weighted at baseline (450 vs 483 rollouts), under noise (0.887 vs 0.836) and with a weak mutator (1.000 vs 0.836). |
+
 ## Standing conclusions
+
+- **Heritability is a property of the landscape, not of optimisers.** Genetic search (Pareto pool + mutate the best,
+  GEPA) wins where a good node's children are good - the synthetic ladder is built that way, and greedy "expand the best"
+  is optimal there. That property is an assumption, not a given, for prompt and program optimisation, and may be the
+  uncommon case; it is also easy to measure on any run (parent-offspring regression of full-evaluation scores). The
+  descendant-value BO target exists for landscapes where it fails, and the ladder cannot test it (2026-09-16).
+- **Batch size is the design decision; "minibatch" is not a free lunch.** The full train set is not automatically the
+  right evaluation size when the goal is fewest calls; the right size is found by heuristics for now (downsample if 200
+  is too expensive per node, and evaluate *everything* at that size). A minibatch that is too small (5 rows on F1:
+  SE ≈ .2) causes problems rather than solving them: near-random accept/reject in GEPA's gate, and a surrogate that must
+  never see such scores as targets. GEPA pays ~20% of its budget on 5-row coin flips; the bo arm now has no minibatch.
 
 - IFBench is a flat landscape for prompt search at every model size published (GEPA: +1.7 on Qwen3-8B,
   +8 on GPT-4.1 Mini; MIPROv2 ~0). With 300 rows, a +2 pt effect is undetectable. Use it as a plumbing /

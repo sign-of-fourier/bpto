@@ -16,6 +16,7 @@ from ..ops import LLMExpander
 from ..tree import ExampleResult, Node, NodeState, Origin, Tree
 
 Feedback = Callable[[Example, ExampleResult], str]
+Passed = Callable[[Example, ExampleResult], bool]
 
 REFLECT_PROMPT = (
     "I gave an assistant the following prompt template to perform a task. The template is supposed to: "
@@ -40,15 +41,25 @@ def default_feedback(example: Example, result: ExampleResult) -> str:
 
 
 class ReflectiveExpander(LLMExpander):
-    """n rewrites of the node's prompt informed by a minibatch of its own (or an ancestor's) traces."""
+    """n rewrites of the node's prompt informed by a minibatch of its own (or an ancestor's) traces.
+
+    On a Program node, `module=` names the module to rewrite (GEPA's one-module-per-child mutation); `feedback` and
+    `passed` may then be dicts keyed by module. Traces shown for a non-entry module come from
+    `ExampleResult.trace[module]` ({"input", "output"}, recorded by the task's scorer) instead of the entry output.
+    """
     name = "reflect"
 
-    def __init__(self, feedback: Feedback = default_feedback, minibatch: int = 3, n: int = 1, calls: int = 1,
-                 seed: int | None = None, max_output_chars: int = 1500, meta_prompt: str | None = None,
-                 config: ModelConfig | None = None, passed: Callable[[Example, ExampleResult], bool] | None = None):
-        super().__init__(n=n, calls=calls, meta_prompt=meta_prompt or REFLECT_PROMPT, config=config)
-        self.feedback, self.minibatch, self.seed, self.max_output_chars = feedback, minibatch, seed, max_output_chars
-        self.passed = passed  # which traces count as successes (failures are shown first); default: objective >= 1
+    def __init__(self, feedback: Feedback | dict[str, Feedback] = default_feedback, minibatch: int = 3, n: int = 1,
+                 calls: int = 1, seed: int | None = None, max_output_chars: int = 1500, meta_prompt: str | None = None,
+                 config: ModelConfig | None = None, passed: Passed | dict[str, Passed] | None = None,
+                 module: str | None = None, max_input_chars: int = 4000):
+        super().__init__(n=n, calls=calls, meta_prompt=meta_prompt or REFLECT_PROMPT, config=config, module=module)
+        pick = lambda f: f[module] if isinstance(f, dict) else f
+        self.feedback, self.minibatch, self.seed = pick(feedback), minibatch, seed
+        self.max_output_chars, self.max_input_chars = max_output_chars, max_input_chars
+        # which traces count as successes (failures are shown first); default: objective >= 1. May return an int
+        # ordering key instead of a bool (0 first) when some failures are more informative than others.
+        self.passed = pick(passed)
 
     def source(self, tree: Tree, node: Node) -> Node | None:
         """The node whose traces are used: itself if evaluated, else the nearest evaluated ancestor."""
@@ -79,16 +90,21 @@ class ReflectiveExpander(LLMExpander):
     def render_examples(self, rows: list[tuple[Example, ExampleResult]]) -> str:
         parts = []
         for i, (ex, r) in enumerate(rows, 1):
-            inputs = "\n".join(f"{k}: {v}" for k, v in ex.inputs.items())
-            out = (r.output or "")[: self.max_output_chars]
+            tr = (r.trace or {}).get(self.module) if self.module else None
+            if tr is not None:  # a non-entry module: show what that stage saw and produced
+                inputs, out = str(tr.get("input", ""))[: self.max_input_chars], str(tr.get("output", ""))
+            else:
+                inputs, out = "\n".join(f"{k}: {v}" for k, v in ex.inputs.items()), (r.output or "")
+            out = out[: self.max_output_chars]
             parts.append(f"### Example {i}\nInputs:\n{inputs}\n\nResponse:\n{out}\n\nFeedback:\n{self.feedback(ex, r)}\n")
         return "\n".join(parts) if parts else "(no traces available)\n"
 
     def render_meta(self, tree: Tree, node: Node, seed: int) -> str:
         _, rows = self.pick(tree, node)
+        cur = self.target(node)
         return self.meta_prompt.format(
-            n=self.n, prompt=node.prompt.template, description=tree.task.description or "(unspecified)",
-            directive=self.render_examples(rows), placeholders=", ".join("{%s}" % p for p in node.prompt.placeholders),
+            n=self.n, prompt=cur.template, description=self.description(tree, node),
+            directive=self.render_examples(rows), placeholders=", ".join("{%s}" % p for p in cur.placeholders),
             seed=f" (variation batch {seed})" if self.calls > 1 else "",
         )
 
@@ -101,7 +117,8 @@ class ReflectiveExpander(LLMExpander):
     async def run_one(self, tree: Tree, node: Node) -> list[Node]:
         src, rows = self.pick(tree, node)
         params = {**self.params(), "source": src.id if src else None, "minibatch_ids": [ex.id for ex, _ in rows]}
-        children = [tree.add_child(node, p, Origin(op=self.name, params=dict(params))) for p in await self.propose(tree, node)]
+        children = [tree.add_child(node, self.child_prompt(node, p), Origin(op=self.name, params=dict(params)))
+                    for p in await self.propose(tree, node)]
         node.state = NodeState.EXPANDED
         tree._emit("expanded", node)
         return children

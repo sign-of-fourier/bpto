@@ -3,9 +3,13 @@ relevant paragraphs (a stand-in for writing retrieval queries), a fixed answerer
 those. Optimising the selector is where the paper's HotpotQA headroom lives; `tasks/hotpotqa` (single prompt
 over all 10 paragraphs) has none on Nova Micro.
 
-Stage A (searched): {question}, {context} -> Titles{titles}. Stage B (fixed, run inside the scorer): question +
-selected paragraphs -> Answer. Rollouts = 2 calls per example, charged to the same client.
+Stage A (entry module "selector"): {question}, {context} -> Titles{titles}. Stage B ("answerer", run inside the
+scorer): question + selected paragraphs -> Answer. Rollouts = 2 calls per example, charged to the same client.
 Metrics: sel_recall / sel_precision / sel_f1 (titles vs supporting_facts), n_selected, em, f1 (answer).
+
+`make_program_task(modules=("selector",))` (default) keeps the answerer fixed at ANSWER_PROMPT and the node a plain
+Prompt; `modules=("selector", "answerer")` makes the node a Program with both under search - the scorer then takes
+the answerer from the node and records stage B's input/output in `ctx.trace["answerer"]` for the reflector.
 """
 from __future__ import annotations
 
@@ -13,7 +17,7 @@ import re
 
 from pydantic import BaseModel, Field
 
-from bpto import Dataset, LinearObjective, ModelClient, ModelConfig, Prompt, Task, combine, output_token_count, token_count
+from bpto import Dataset, LinearObjective, ModelClient, ModelConfig, Program, Prompt, Task, combine, output_token_count, token_count
 
 from . import AnswerWithReasoning, em_f1, load_or_fetch
 
@@ -63,10 +67,12 @@ def select_titles(parsed, context: str) -> list[str]:
 
 
 def program_scorer(answer_prompt: str = ANSWER_PROMPT, answer_config: ModelConfig | None = None, max_selected: int = 4):
-    """Stage B inside the scorer: answer from the selected paragraphs, then score both stages."""
-    ans_prompt = Prompt(template=answer_prompt)
+    """Stage B inside the scorer: answer from the selected paragraphs, then score both stages. The answerer prompt
+    is the node's "answerer" module when the node is a Program, else `answer_prompt`."""
+    fixed = Prompt(template=answer_prompt)
 
     async def _score(prompt, example, completion, ctx):
+        ans_prompt = prompt.modules["answerer"] if isinstance(prompt, Program) and "answerer" in prompt.modules else fixed
         context = example.inputs["context"]
         picked = select_titles(completion.parsed, context)[:max_selected]
         gold = {_norm_title(t) for t in example.meta.get("supporting_titles", [])}
@@ -78,22 +84,36 @@ def program_scorer(answer_prompt: str = ANSWER_PROMPT, answer_config: ModelConfi
         paras = paragraphs(context)
         sub = "\n\n".join(paras[t] for t in picked) if picked else "(no paragraphs selected)"
         cfg = (answer_config or ctx.task.config or ctx.client.default_config)
-        comp = await ctx.client.complete(ans_prompt.render(context=sub, question=example.inputs["question"]),
-                                         config=cfg, schema=AnswerWithReasoning)
+        rendered = ans_prompt.render(context=sub, question=example.inputs["question"])
+        comp = await ctx.client.complete(rendered, config=cfg, schema=AnswerWithReasoning)
         a = comp.parsed
         pred = (a.get("answer") if isinstance(a, dict) else getattr(a, "answer", None)) or ""
         em, f1 = em_f1(pred, example.answer or "")
+        ctx.trace["answerer"] = {"input": f"question: {example.inputs['question']}\nselected paragraphs:\n{sub}",
+                                 "output": comp.text, "answer": pred}
         return {"sel_recall": rec, "sel_precision": prec, "sel_f1": sf1, "n_selected": float(len(picked)),
                 "em": em, "f1": f1, "answer_tokens": float(comp.output_tokens)}
     return _score
 
 
+DESCRIPTIONS = {
+    "selector": "selects, from ten Wikipedia paragraphs, the ones needed to answer a multi-hop question "
+                "(a second prompt then answers from the selected paragraphs only)",
+    "answerer": "answers a multi-hop question from the two or so paragraphs a first prompt selected, giving the "
+                "shortest exact answer (scored by token F1 against a short reference answer)",
+}
+
+
 def make_program_task(client: ModelClient, dataset: Dataset | None = None, objective=None, root: str = SELECT_ROOT,
-                      config: ModelConfig | None = None, **kw) -> Task:
+                      config: ModelConfig | None = None, modules: tuple[str, ...] = ("selector",), **kw) -> Task:
+    if "answerer" in modules:
+        root_prompt = {"selector": root, "answerer": ANSWER_PROMPT}
+        description = {k: DESCRIPTIONS[k] for k in root_prompt}
+    else:
+        root_prompt, description = root, DESCRIPTIONS["selector"].replace("a second prompt", "a fixed second prompt")
     return Task(
-        root=root,
-        description="selects, from ten Wikipedia paragraphs, the ones needed to answer a multi-hop question "
-                    "(a fixed second prompt then answers from the selected paragraphs)",
+        root=root_prompt,
+        description=description,
         dataset=dataset if dataset is not None else load_or_fetch(),
         schema=Titles,
         scorer=combine(program_scorer(), token_count(), output_token_count()),

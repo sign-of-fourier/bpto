@@ -16,7 +16,7 @@ from pydantic import BaseModel, Field
 from .data import Dataset, Example
 from .llm import BudgetExceeded, Completion, ModelConfig
 from .metrics import mean_metrics, std_metrics
-from .prompt import Prompt
+from .prompt import Program, Prompt
 from .scoring import ObjectiveContext, ScoreContext, run_scorer
 from .tree import Evaluation, ExampleResult, Node, NodeState, Origin, Tree
 
@@ -52,17 +52,42 @@ class Variants(BaseModel):
 
 
 class Expander(Op):
-    """Proposes children for a node. Subclasses implement `propose`."""
+    """Proposes children for a node. Subclasses implement `propose`.
+
+    `module`: on Program nodes, rewrite only that module (the child is the parent with one module swapped);
+    None means the entry module of a Program, or the whole Prompt of a plain node. Never the whole program.
+    """
+    module: str | None = None
 
     def params(self) -> dict[str, Any]:
-        return {}
+        return {"module": self.module} if self.module else {}
+
+    def target(self, node: Node) -> Prompt:
+        """The prompt being rewritten."""
+        if isinstance(node.prompt, Program):
+            return node.prompt.modules[self.module or node.prompt.entry]
+        if self.module:
+            raise ValueError(f"module={self.module!r} on a single-prompt node")
+        return node.prompt
+
+    def child_prompt(self, node: Node, p: Prompt) -> Prompt | Program:
+        if isinstance(node.prompt, Program):
+            return node.prompt.with_module(self.module or node.prompt.entry, p)
+        return p
+
+    def description(self, tree: Tree, node: Node) -> str:
+        d = tree.task.description
+        if isinstance(d, dict):
+            d = d.get(self.module or (node.prompt.entry if isinstance(node.prompt, Program) else ""), "")
+        return d or "(unspecified)"
 
     @abstractmethod
     async def propose(self, tree: Tree, node: Node) -> list[Prompt]: ...
 
     async def run_one(self, tree: Tree, node: Node) -> list[Node]:
         # a fresh Origin per child: params are per-node state (analysis tags), not shared across siblings
-        children = [tree.add_child(node, p, Origin(op=self.name, params=self.params())) for p in await self.propose(tree, node)]
+        children = [tree.add_child(node, self.child_prompt(node, p), Origin(op=self.name, params=self.params()))
+                    for p in await self.propose(tree, node)]
         node.state = NodeState.EXPANDED
         tree._emit("expanded", node)
         return children
@@ -105,21 +130,22 @@ class LLMExpander(Expander):
     )
 
     def __init__(self, n: int = 4, directive: str = "", calls: int = 1, meta_prompt: str | None = None,
-                 config: ModelConfig | None = None):
-        self.n, self.directive, self.calls, self.config = n, directive, calls, config
+                 config: ModelConfig | None = None, module: str | None = None):
+        self.n, self.directive, self.calls, self.config, self.module = n, directive, calls, config, module
         if meta_prompt:
             self.meta_prompt = meta_prompt
 
     def params(self) -> dict[str, Any]:
-        p = {"n": self.n, "directive": self.directive, "calls": self.calls}
+        p = {**super().params(), "n": self.n, "directive": self.directive, "calls": self.calls}
         if self.config is not None:
             p["config"] = self.config.model_dump(exclude_unset=True)
         return p
 
     def render_meta(self, tree: Tree, node: Node, seed: int) -> str:
+        cur = self.target(node)
         return self.meta_prompt.format(
-            n=self.n, prompt=node.prompt.template, description=tree.task.description or "(unspecified)",
-            directive=self.directive, placeholders=", ".join("{%s}" % p for p in node.prompt.placeholders),
+            n=self.n, prompt=cur.template, description=self.description(tree, node),
+            directive=self.directive, placeholders=", ".join("{%s}" % p for p in cur.placeholders),
             seed=f" (variation batch {seed})" if self.calls > 1 else "",
         )
 
@@ -130,8 +156,9 @@ class LLMExpander(Expander):
             task.expander_client.complete(self.render_meta(tree, node, i), config=cfg, schema=Variants)
             for i in range(self.calls)
         ), return_exceptions=True)
-        required = set(node.prompt.placeholders)
-        out, seen = [], {node.prompt.template}
+        cur = self.target(node)
+        required = set(cur.placeholders)
+        out, seen = [], {cur.template}
         for c in comps:
             if isinstance(c, BudgetExceeded):
                 raise c
@@ -233,9 +260,10 @@ class evaluate(Op):
         cfg = (task.config or task.client.default_config).merged(node.config)
         try:
             comp = await task.client.complete(rendered, config=cfg, schema=task.schema)
-            metrics = await run_scorer(task.scorer, node.prompt, ex, comp, ScoreContext(task, task.client, rendered))
+            ctx = ScoreContext(task, task.client, rendered)
+            metrics = await run_scorer(task.scorer, node.prompt, ex, comp, ctx)
             parsed = comp.parsed.model_dump() if isinstance(comp.parsed, BaseModel) else comp.parsed
-            return ExampleResult(example_id=ex.id, output=comp.text, parsed=parsed, metrics=metrics)
+            return ExampleResult(example_id=ex.id, output=comp.text, parsed=parsed, metrics=metrics, trace=ctx.trace or None)
         except BudgetExceeded:
             raise
         except Exception as e:  # a failed example scores as its failure, not a crash of the run

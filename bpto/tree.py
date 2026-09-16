@@ -12,7 +12,7 @@ from pydantic import BaseModel, Field
 
 from .llm import ModelConfig
 from .metrics import Metrics
-from .prompt import Prompt
+from .prompt import Program, Prompt, as_prompt
 
 if TYPE_CHECKING:
     from .task import Task
@@ -35,6 +35,7 @@ class ExampleResult(BaseModel):
     parsed: Any = None
     metrics: Metrics
     error: str | None = None
+    trace: dict[str, Any] | None = None  # non-entry module inputs/outputs, filled by the scorer (programs)
 
 
 class Evaluation(BaseModel):
@@ -51,12 +52,12 @@ class Node(BaseModel):
     id: str = Field(default_factory=lambda: uuid.uuid4().hex[:10])
     parent_id: str | None = None
     depth: int = 0
-    prompt: Prompt
+    prompt: Prompt | Program
     config: ModelConfig | None = None  # per-node override of the task's default
     origin: Origin = Origin(op="root")
     state: NodeState = NodeState.PROPOSED
     evaluation: Evaluation | None = None
-    embedding: list[float] | None = None
+    embedding: list[float] | dict[str, list[float]] | None = None  # per-module for a Program
     created_at: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))
 
     @property
@@ -69,7 +70,7 @@ class Node(BaseModel):
 
 
 class Tree:
-    def __init__(self, task: "Task", root: Prompt | str | None = None):
+    def __init__(self, task: "Task", root: Prompt | Program | str | dict | None = None):
         self.task = task
         self.nodes: dict[str, Node] = {}
         self.children: dict[str, list[str]] = {}
@@ -80,8 +81,8 @@ class Tree:
 
     # ---- construction --------------------------------------------------------------
     @staticmethod
-    def _as_prompt(p: Prompt | str) -> Prompt:
-        return p if isinstance(p, Prompt) else Prompt(template=p)
+    def _as_prompt(p: Prompt | Program | str | dict) -> Prompt | Program:
+        return as_prompt(p)
 
     def _add(self, node: Node) -> Node:
         self.nodes[node.id] = node
@@ -90,7 +91,7 @@ class Tree:
             self.children[node.parent_id].append(node.id)
         return node
 
-    def add_child(self, parent: Node, prompt: Prompt | str, origin: Origin, config: ModelConfig | None = None) -> Node:
+    def add_child(self, parent: Node, prompt: Prompt | Program | str | dict, origin: Origin, config: ModelConfig | None = None) -> Node:
         node = Node(parent_id=parent.id, depth=parent.depth + 1, prompt=self._as_prompt(prompt),
                     origin=origin, config=config if config is not None else parent.config)
         self._add(node)

@@ -14,7 +14,7 @@ from pydantic import BaseModel, Field
 from .data import Example
 from .llm import Completion, ModelClient
 from .metrics import Metrics
-from .prompt import Prompt
+from .prompt import Program, Prompt
 
 if TYPE_CHECKING:
     from .task import Task
@@ -26,9 +26,10 @@ class ScoreContext:
     task: "Task"
     client: ModelClient
     rendered_prompt: str
+    trace: dict[str, Any] = field(default_factory=dict)  # a program scorer records its other modules' input/output here
 
 
-ScorerFn = Callable[[Prompt, Example, Completion, ScoreContext], Metrics | Awaitable[Metrics]]
+ScorerFn = Callable[[Prompt | Program, Example, Completion, ScoreContext], Metrics | Awaitable[Metrics]]
 
 
 class Scorer(Protocol):

@@ -4,7 +4,7 @@ from .llm import AnthropicClient, BedrockClient, Budget, BudgetExceeded, Complet
 from .metrics import Metrics
 from .observe import EventLog, Progress, lineage, plot_tree, tree_dot, tree_text
 from .ops import Expander, LLMExpander, Op, Pipeline, evaluate, guided, random
-from .prompt import Prompt
+from .prompt import Program, Prompt
 from .search import RunResult, Step, Stop, run, step, successive_halving
 from .scoring import (ConstrainedObjective, LinearObjective, ObjectiveContext, ScoreContext, combine,
                       exact_match, llm_judge, output_token_count, pareto_front, template_tokens, token_count)

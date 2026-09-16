@@ -64,3 +64,41 @@ def program_feedback(example: Example, result: ExampleResult) -> str:
     if example.meta.get("type") == "comparison":
         parts.append("comparison question: the paragraphs for both compared entities are needed")
     return "; ".join(parts)
+
+
+# --- answerer module (program with both modules under search): what stage B saw is in result.trace["answerer"]
+
+def answerer_passed(example: Example, result: ExampleResult) -> bool:
+    return not result.error and result.metrics.get("em", 0.0) == 1.0
+
+
+def answerer_feedback(example: Example, result: ExampleResult) -> str:
+    if result.error:
+        return f"The response failed with an error: {result.error}"
+    tr = (result.trace or {}).get("answerer") or {}
+    pred = tr.get("answer", "")
+    em, f1 = em_f1(str(pred), example.answer or "")
+    parts = [f"expected answer: {example.answer!r}; model answered: {pred!r}; F1 {f1:.2f}" + (" (exact match)" if em else "")]
+    if result.metrics.get("sel_recall", 1.0) < 1.0:
+        parts.append("NOTE: the paragraphs given to this stage were incomplete (a needed one was not selected), so a "
+                     "full answer may not have been possible from them - do not over-fit the prompt to this case")
+    elif not em:
+        parts.append("the paragraphs given contained the facts needed: the answer stage itself fell short "
+                     "(wrong fact, wrong span, or extra words - F1 rewards the shortest exact span)")
+    if example.meta.get("type") == "comparison":
+        parts.append("comparison question: look up the attribute for both entities, then compare")
+    return "; ".join(parts)
+
+
+def answerer_trace_order(example: Example, result: ExampleResult) -> int:
+    """Sort key for the answerer's minibatch: recoverable misses first (gold paragraphs present, answer wrong), then
+    misses the selector caused, then passes."""
+    if result.error:
+        return 0
+    if result.metrics.get("em", 0.0) == 1.0:
+        return 2
+    return 0 if result.metrics.get("sel_recall", 0.0) == 1.0 else 1
+
+
+FEEDBACK = {"selector": program_feedback, "answerer": answerer_feedback}
+PASSED = {"selector": program_passed, "answerer": answerer_trace_order}  # int key: recoverable misses first

@@ -11,14 +11,21 @@ interrupted arm-seed pays only for what it had not already done.
 Arms (same root, train split, reflector model, minibatch, gate and rollout budget):
     gepa   Pareto pool on per-example F1, sample ∝ wins, 1 reflected child/round, minibatch gate (child > parent).
     gepa3  control: as gepa but 3 children/round, keep 1 at random - isolates "more proposals" from "surrogate picks".
-    bo     EI over the Pareto candidates with value = best child's F1 (GEPA sampler until `warmup` parents have
-           evaluated children), 3 reflected children, surrogate keeps 1 for the minibatch.
+    bo     no minibatch. EI over the candidates with value = the candidate's own full-train F1 (GEPA sampler until
+           `warmup` candidates have been expanded), 3 reflected children, surrogate keeps 1 and it gets the full train set.
+           The GP trains on full evaluations only (never on minibatch scores); targets PIT-transformed
+           (`--bo-transform`), per-node noise = F1 SE. `--bo-gate minibatch` restores the old two-filter schedule.
     mipro  MIPROv2 (0-shot): N grounded instruction candidates proposed once from the root, then categorical TPE
            trials on minibatches (evaluations accumulate, so a candidate's coverage grows toward the full set),
            and every `full_every` trials the best-by-mean candidate gets the full train set. No feedback, no tree growth.
 
 Per (arm, seed): runs/<out>/<arm>-s<seed>/{tree.json,events.jsonl,trace.jsonl,cache.jsonl} + a row in results.jsonl
 (anytime curve of best train F1, held-out EM/F1 of root and best, proposal/gate counts).
+
+Programs: `--program --modules selector,answerer` makes every node a two-module Program. Mutation is GEPA's
+round-robin (module r mod M, one module rewritten per child, both arms). The bo arm then uses `AdditiveGPR` (one RBF
+per module, summed) with per-node noise (F1 SE), ranks parents on the round's module component, and at the end
+evaluates the additive model's "recombination" (per-module argmax of posterior mean) on train and held-out.
 """
 from __future__ import annotations
 
@@ -32,14 +39,14 @@ import statistics
 import time
 from pathlib import Path
 
-from bpto import Budget, CompletionCache, Dataset, EventLog, ModelConfig, Stop, Tree, evaluate, run, select
-from bpto.bo import EI, GPR, BOSelector, HashEmbedder
+from bpto import Budget, CompletionCache, Dataset, EventLog, ModelConfig, Origin, Stop, Tree, evaluate, run, select
+from bpto.bo import EI, GPR, AdditiveGPR, BOSelector, HashEmbedder
 from bpto.gepa import ReflectiveExpander, beats_parent, candidates, pareto_sample
 from bpto.gepa.loop import minibatch_for
 from bpto.mipro import CategoricalTPE, GroundedProposer, dataset_summary
 from bpto.search import step
 from tasks.hotpotqa import load_or_fetch, make_task
-from tasks.hotpotqa.feedback import feedback, passed, program_feedback, program_passed
+from tasks.hotpotqa.feedback import FEEDBACK, PASSED, feedback, passed, program_feedback, program_passed
 from tasks.hotpotqa.program import make_program_task
 
 from .compare import load_env
@@ -51,8 +58,13 @@ def f1_of(n) -> float | None:
     return n.evaluation.metrics.get("f1") if n.evaluation is not None else None
 
 
+def is_full(node, tree) -> bool:
+    ids = {ex.id for ex in tree.task.dataset}
+    return node.evaluation is not None and ids.issubset(set(node.evaluation.dataset_ids))
+
+
 def node_value(node, tree=None) -> float | None:
-    """BO training target for a child: its F1 on whatever it was evaluated on (minibatch or full)."""
+    """BO training target for a child: its F1 on whatever it was evaluated on (minibatch or full). Old gate only."""
     return f1_of(node)
 
 
@@ -61,31 +73,84 @@ def best_child_value(node, tree) -> float | None:
     return max(vals) if vals else None
 
 
+def full_value(node, tree) -> float | None:
+    """Own F1, only when measured on the full train set - minibatch scores never enter the GP."""
+    return f1_of(node) if is_full(node, tree) else None
+
+
+def best_full_child_value(node, tree) -> float | None:
+    vals = [f1_of(c) for c in tree.child_nodes(node) if is_full(c, tree)]
+    return max(vals) if vals else None
+
+
+def best_full_child_se(node, tree) -> float | None:
+    kids = [c for c in tree.child_nodes(node) if is_full(c, tree)]
+    return f1_se(max(kids, key=f1_of)) if kids else None
+
+
 def best_candidate(tree, ids):
     return max(candidates(tree, ids), key=lambda n: n.evaluation.metrics["f1"], default=None)
 
 
-def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_state: dict):
-    parent_bo = child_bo = None
+def f1_se(node, tree=None) -> float | None:
+    """Per-node measurement noise for the surrogate: SE of the node's own F1 (minibatch-5 nodes ≈ .2, full-200 ≈ .03)."""
+    ev = node.evaluation
+    return ev.metrics_std.get("f1", 0.0) / max(1, ev.n) ** 0.5 if ev is not None else None
+
+
+def best_child_se(node, tree) -> float | None:
+    kids = [c for c in tree.child_nodes(node) if c.evaluation is not None]
+    return f1_se(max(kids, key=f1_of)) if kids else None
+
+
+def modules_of(args) -> list[str]:
+    return [m for m in args.modules.split(",") if m] if args.program else []
+
+
+def template_of(node, module: str | None) -> str:
+    return node.prompt.modules[module].template if module else node.prompt.template
+
+
+def make_bo(args, embedder, value, noise):
+    multi = len(modules_of(args)) > 1
+    return BOSelector(embedder, AdditiveGPR() if multi else GPR(), EI(), value=value, noise=None if args.no_noise else noise,
+                      transform=None if args.bo_transform == "none" else args.bo_transform)
+
+
+def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_state: dict, bos: dict):
+    modules = modules_of(args)
+    multi = len(modules) > 1
 
     def schedule(tree, r):
-        nonlocal parent_bo, child_bo
         full = tree.task.dataset
         ids = {ex.id for ex in full}
         if not tree.evaluated_nodes():
             return [step(evaluate(dataset=full), select.root, name="root")]
         if arm == "mipro":
             return mipro_round(tree, r, full, ids)
-        if arm == "bo" and parent_bo is None:
-            parent_bo = BOSelector(embedder, GPR(), EI(), value=best_child_value)
-            child_bo = BOSelector(embedder, GPR(), EI(), value=node_value)
+        pure = arm == "bo" and args.bo_gate == "none"
+        if arm == "bo" and "parent" not in bos:
+            if pure:
+                # parent target = the candidate's OWN full-train F1 (not its best child's: that rewards a parent for
+                # having been expanded and locks EI onto it - ladder 0.50 vs 0.995, 2026-09-16)
+                bos["parent"] = make_bo(args, embedder, full_value, f1_se)
+                bos["child"] = make_bo(args, embedder, full_value, f1_se)
+            else:
+                bos["parent"] = make_bo(args, embedder, best_child_value, best_child_se)
+                bos["child"] = make_bo(args, embedder, node_value, f1_se)
+        parent_bo, child_bo = bos.get("parent"), bos.get("child")
 
+        module = modules[r % len(modules)] if multi else None  # GEPA's round-robin, same r for every arm
         mb = minibatch_for(r, full, args.minibatch, seed)
         is_new = lambda n: n.origin.op == "reflect" and n.evaluation is None and n.id not in screened
         on_mb = lambda n: n.origin.op == "reflect" and n.evaluation is not None and not ids.issubset(set(n.evaluation.dataset_ids))
         sampler = pareto_sample(1, mode="weighted", seed=seed * 7919 + r, ids=ids, metric="f1")
-        fb, ok = (program_feedback, program_passed) if args.program else (feedback, passed)
-        mutator = ReflectiveExpander(fb, minibatch=args.minibatch, n=1 if arm == "gepa" else 3, seed=seed + r, passed=ok)
+        if multi:
+            fb, ok = FEEDBACK, PASSED
+        else:
+            fb, ok = (program_feedback, program_passed) if args.program else (feedback, passed)
+        mutator = ReflectiveExpander(fb, minibatch=args.minibatch, n=1 if arm == "gepa" else 3, seed=seed + r, passed=ok,
+                                     module=module)
 
         if arm == "gepa":
             parent, to_minibatch = sampler, select.where(is_new)
@@ -103,10 +168,11 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
                 return [keep]
         else:
             async def parent(tree):
-                trained = [n for n in tree if n.state == "expanded" and parent_bo.value(n, tree) is not None]
+                trained = ([n for n in candidates(tree, ids) if n.state == "expanded"] if pure
+                           else [n for n in tree if n.state == "expanded" and parent_bo.value(n, tree) is not None])
                 if len(trained) < args.warmup:
                     return sampler(tree)
-                ranked = await parent_bo.rank(tree, candidates(tree, ids))
+                ranked = await parent_bo.rank(tree, candidates(tree, ids), module=module if args.parent_rank == "module" else None)
                 tree.meta.setdefault("bo_fits", []).append({"round": r, **{k: v for k, v in parent_bo.last_fit.items() if k != "pred"}})
                 return [n for _, n in ranked[:1]]
 
@@ -119,14 +185,31 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
                     screened.add(n.id); n.origin.params["screened_out"] = True
                 return [ranked[0][1]]
 
+        def tag(n):
+            par = tree.nodes[n.parent_id]
+            m = n.origin.params.get("module")
+            n.origin.params["diff_ratio"] = round(difflib.SequenceMatcher(None, template_of(par, m), template_of(n, m)).ratio(), 3)
+
         def gate(tree):
             new = select.where(on_mb)(tree)
             ok = [n for n in new if beats_parent(tree, n)]
             for n in new:
                 n.origin.params["accepted"] = n in ok
-                par = tree.nodes[n.parent_id]
-                n.origin.params["diff_ratio"] = round(difflib.SequenceMatcher(None, par.prompt.template, n.prompt.template).ratio(), 3)
+                tag(n)
             return ok
+
+        if pure:
+            # one full evaluation per round: the surrogate's pick among the fresh children, nothing else
+            async def to_full(tree):
+                keep = await to_minibatch(tree)
+                for n in keep:
+                    tag(n)
+                    n.origin.params["accepted"] = None  # decided after the evaluation, by `record`
+                return keep
+            return [
+                step(mutator, parent, name=f"r{r}/reflect"),
+                step(evaluate(dataset=full), to_full, name=f"r{r}/full"),
+            ]
 
         return [
             step(mutator, parent, name=f"r{r}/reflect"),
@@ -175,7 +258,8 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
 
 def make_clients(args, cache, global_budget, data):
     k = 2 if args.program else 1  # the program makes two task-model calls per example (selector + answerer)
-    per_run = Budget(max_calls=args.rollouts + k * (args.n_train + 2 * args.holdout) + 50, parent=global_budget)
+    extra = k * (args.n_train + args.holdout) if len(modules_of(args)) > 1 else 0  # recombination readout (bo arm)
+    per_run = Budget(max_calls=args.rollouts + k * (args.n_train + 2 * args.holdout) + extra + 50, parent=global_budget)
     if args.mock:
         from tasks.hotpotqa.mock import _mock_client
         c = _mock_client(data, max_concurrency=8); c.budget = per_run
@@ -194,12 +278,12 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
     client, reflect_client = make_clients(args, None if args.mock else CompletionCache(out / "cache.jsonl"), global_budget, full_data)
     cfg = ModelConfig(max_tokens=args.max_tokens, temperature=args.eval_temperature)
     ek = dict(expander_client=reflect_client, expander_config=ModelConfig(max_tokens=2048, temperature=args.reflect_temperature))
-    task = (make_program_task(client, train, config=cfg, **ek) if args.program
+    task = (make_program_task(client, train, config=cfg, modules=tuple(modules_of(args) or ["selector"]), **ek) if args.program
             else make_task(client, train, config=cfg, reasoning=not args.no_reasoning, **ek))
     tree = Tree(task)
     EventLog(out / "events.jsonl", tree)
     ids = {ex.id for ex in train}
-    curve, screened, mipro_state = [], set(), {}
+    curve, screened, mipro_state, bos = [], set(), {}, {}
     t0 = time.time()
 
     def record(tree, r, st):
@@ -210,6 +294,9 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
             node = tree.nodes[mipro_state["cands"][c]]
             per = {x.example_id: x.metrics.get("f1", 0.0) for x in node.evaluation.per_example}
             mipro_state["tpe"].observe(c, sum(per.get(i, 0.0) for i in mb_ids) / max(1, len(mb_ids)))
+        for n in tree:  # pure bo: "accepted" = beat the parent on the full set (bookkeeping only, no gate)
+            if n.origin.params.get("accepted") is None and "accepted" in n.origin.params and n.evaluation is not None:
+                n.origin.params["accepted"] = beats_parent(tree, n)
         bc = best_candidate(tree, ids)
         curve.append({"calls": client.usage.calls, "round": r, "step": st.name.split("/")[-1],
                       "best_f1": f1_of(bc) if bc else None, "best_em": bc.evaluation.metrics.get("em") if bc else None,
@@ -221,7 +308,7 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
         idle["rounds"] = idle["rounds"] + 1 if client.usage.calls == idle["calls"] else 0
         idle["calls"] = client.usage.calls
         return client.usage.calls >= args.rollouts or idle["rounds"] >= 25 * 3
-    res = await run(tree, schedule_for(arm, seed, args, embedder, client, screened, mipro_state),
+    res = await run(tree, schedule_for(arm, seed, args, embedder, client, screened, mipro_state, bos),
                     stop=Stop(rounds=100_000, until=done), checkpoint=out / "tree.json", on_step=record)
     search_calls = client.usage.calls
     best = best_candidate(tree, ids)
@@ -230,12 +317,33 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
     cands = candidates(tree, ids)
     proposed = [n for n in tree if n.origin.op in ("reflect", "mipro_propose")]
     gated = [n for n in proposed if "accepted" in n.origin.params]
+    modules = modules_of(args)
+    recomb = None
+    if arm == "bo" and len(modules) > 1 and "child" in bos and len(cands) > 1:
+        # the additive model's best program: per-module argmax of posterior mean over the candidates
+        await bos["child"].rank(tree, cands[:1])  # (re)fit on every evaluated node
+        pick = await bos["child"].argmax_modules(tree, cands)
+        prog = tree.root.prompt
+        for m, n in pick.items():
+            prog = prog.with_module(m, n.prompt.modules[m])
+        same = next((n for n in cands if n.prompt == prog), None)
+        node = same or tree.add_child(best, prog, Origin(op="recombine", params={"modules": {m: n.id for m, n in pick.items()}}))
+        if same is None:
+            await tree.apply(evaluate(dataset=train), lambda t: [node])
+            tree.save(out / "tree.json")
+        held_r = await evaluate(dataset=held).score(tree, node)
+        recomb = {"id": node.id, "existing": same is not None, "parts": {m: n.id for m, n in pick.items()},
+                  "train": node.evaluation.metrics, "held": held_r.metrics, "prompt": str(node.prompt)}
     row = {"arm": arm, "seed": seed, "rollouts": search_calls, "held_calls": client.usage.calls - search_calls,
            "stopped": res.stopped_because, "seconds": round(time.time() - t0, 1), "nodes": len(tree), "candidates": len(cands),
            "root_f1": f1_of(tree.root), "root_em": tree.root.evaluation.metrics["em"], "root_sel_recall": tree.root.evaluation.metrics.get("sel_recall"),
            "best_train_sel_recall": best.evaluation.metrics.get("sel_recall"),
            "best_id": best.id, "best_depth": best.depth, "best_train_f1": f1_of(best), "best_train_em": best.evaluation.metrics["em"],
-           "root_held": root_ev.metrics, "best_held": best_ev.metrics, "best_prompt": best.prompt.template,
+           "root_held": root_ev.metrics, "best_held": best_ev.metrics, "best_prompt": str(best.prompt),
+           "modules": modules or None,
+           "accepted_by_module": {m: sum(n.origin.params["accepted"] for n in gated if n.origin.params.get("module") == m) for m in modules} or None,
+           "best_lineage_modules": [n.origin.params.get("module") for n in [best, *tree.ancestors(best)] if n.origin.op == "reflect"] or None,
+           "recombination": recomb, "bo_fits": tree.meta.get("bo_fits"),
            "proposed": len(proposed), "screened_out": len(screened), "gated": len(gated),
            "accepted": sum(n.origin.params["accepted"] for n in gated),
            "mean_diff_ratio": round(statistics.mean(n.origin.params["diff_ratio"] for n in gated), 3) if gated else None,
@@ -327,6 +435,11 @@ if __name__ == "__main__":
     ap.add_argument("--max-usd", type=float, default=4.0, help="hard cap on the whole experiment")
     ap.add_argument("--no-reasoning", action="store_true", help="answer-only schema (default: reasoning field before the answer)")
     ap.add_argument("--program", action="store_true", help="two-stage program (tasks.hotpotqa.program): search the paragraph selector; rollouts count both stages' calls")
+    ap.add_argument("--modules", default="selector", help="with --program: comma-separated modules under search (selector,answerer -> Program nodes, round-robin)")
+    ap.add_argument("--no-noise", action="store_true", help="bo: do not pass per-node F1 SE to the surrogate")
+    ap.add_argument("--bo-gate", choices=["none", "minibatch"], default="none", help="bo: none = surrogate pick gets the full set directly (GP trains on full evals only); minibatch = old two-filter schedule")
+    ap.add_argument("--bo-transform", choices=["pit", "none"], default="pit", help="bo: target transform for the surrogate")
+    ap.add_argument("--parent-rank", choices=["full", "module"], default="full", help="bo, multi-module: EI on the full posterior or on the round's module component")
     ap.add_argument("--mock", action="store_true")
     ap.add_argument("--out", default="runs/hotpot")
     asyncio.run(main(ap.parse_args()))

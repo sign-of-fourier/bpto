@@ -102,7 +102,8 @@ res = await run(tree, gepa(feedback, minibatch=3, mode="weighted"), stop=Stop(ro
 training example, dominated ones removed, drawn ∝ examples won) → `ReflectiveExpander` rewrites the prompt
 after reading a minibatch of the parent's outputs plus `feedback` → the child is evaluated on that
 minibatch → only if it beats its parent there does it get the full set and join the pool.
-`mode="weighted" | "uniform" | "best" | "all"` ablates the stochastic and Pareto parts; `BOSelector` can
+(The bo comparison arm in `experiments/live_compare/` no longer uses this gate: the surrogate's pick goes straight to the full set,
+see `experiments/2026-09-16-hotpotqa-bo-pure/`.) `mode="weighted" | "uniform" | "best" | "all"` ablates the stochastic and Pareto parts; `BOSelector` can
 be dropped in as the parent selector (`among=pareto_pool`) or as a pre-screen on children.
 
 This is a deliberately simplified re-implementation of **GEPA** — Agrawal et al., 2025, *"GEPA: Reflective
