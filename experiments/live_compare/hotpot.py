@@ -39,7 +39,8 @@ from bpto.gepa.loop import minibatch_for
 from bpto.mipro import CategoricalTPE, GroundedProposer, dataset_summary
 from bpto.search import step
 from tasks.hotpotqa import load_or_fetch, make_task
-from tasks.hotpotqa.feedback import feedback, passed
+from tasks.hotpotqa.feedback import feedback, passed, program_feedback, program_passed
+from tasks.hotpotqa.program import make_program_task
 
 from .compare import load_env
 
@@ -83,7 +84,8 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
         is_new = lambda n: n.origin.op == "reflect" and n.evaluation is None and n.id not in screened
         on_mb = lambda n: n.origin.op == "reflect" and n.evaluation is not None and not ids.issubset(set(n.evaluation.dataset_ids))
         sampler = pareto_sample(1, mode="weighted", seed=seed * 7919 + r, ids=ids, metric="f1")
-        mutator = ReflectiveExpander(feedback, minibatch=args.minibatch, n=1 if arm == "gepa" else 3, seed=seed + r, passed=passed)
+        fb, ok = (program_feedback, program_passed) if args.program else (feedback, passed)
+        mutator = ReflectiveExpander(fb, minibatch=args.minibatch, n=1 if arm == "gepa" else 3, seed=seed + r, passed=ok)
 
         if arm == "gepa":
             parent, to_minibatch = sampler, select.where(is_new)
@@ -172,7 +174,8 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
 
 
 def make_clients(args, cache, global_budget, data):
-    per_run = Budget(max_calls=args.rollouts + args.n_train + 2 * args.holdout + 50, parent=global_budget)
+    k = 2 if args.program else 1  # the program makes two task-model calls per example (selector + answerer)
+    per_run = Budget(max_calls=args.rollouts + k * (args.n_train + 2 * args.holdout) + 50, parent=global_budget)
     if args.mock:
         from tasks.hotpotqa.mock import _mock_client
         c = _mock_client(data, max_concurrency=8); c.budget = per_run
@@ -189,8 +192,10 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
     train, rest = full_data.split(args.n_train / len(full_data), seed=seed)
     held = rest.sample(args.holdout, seed=seed)
     client, reflect_client = make_clients(args, None if args.mock else CompletionCache(out / "cache.jsonl"), global_budget, full_data)
-    task = make_task(client, train, config=ModelConfig(max_tokens=args.max_tokens, temperature=args.eval_temperature), reasoning=not args.no_reasoning, expander_client=reflect_client,
-                     expander_config=ModelConfig(max_tokens=2048, temperature=args.reflect_temperature))
+    cfg = ModelConfig(max_tokens=args.max_tokens, temperature=args.eval_temperature)
+    ek = dict(expander_client=reflect_client, expander_config=ModelConfig(max_tokens=2048, temperature=args.reflect_temperature))
+    task = (make_program_task(client, train, config=cfg, **ek) if args.program
+            else make_task(client, train, config=cfg, reasoning=not args.no_reasoning, **ek))
     tree = Tree(task)
     EventLog(out / "events.jsonl", tree)
     ids = {ex.id for ex in train}
@@ -208,6 +213,7 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
         bc = best_candidate(tree, ids)
         curve.append({"calls": client.usage.calls, "round": r, "step": st.name.split("/")[-1],
                       "best_f1": f1_of(bc) if bc else None, "best_em": bc.evaluation.metrics.get("em") if bc else None,
+                      "best_sel_recall": bc.evaluation.metrics.get("sel_recall") if bc else None,
                       "best_id": bc.id if bc else None, "candidates": len(candidates(tree, ids)), "nodes": len(tree)})
     idle = {"calls": -1, "rounds": 0}
 
@@ -226,7 +232,8 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
     gated = [n for n in proposed if "accepted" in n.origin.params]
     row = {"arm": arm, "seed": seed, "rollouts": search_calls, "held_calls": client.usage.calls - search_calls,
            "stopped": res.stopped_because, "seconds": round(time.time() - t0, 1), "nodes": len(tree), "candidates": len(cands),
-           "root_f1": f1_of(tree.root), "root_em": tree.root.evaluation.metrics["em"],
+           "root_f1": f1_of(tree.root), "root_em": tree.root.evaluation.metrics["em"], "root_sel_recall": tree.root.evaluation.metrics.get("sel_recall"),
+           "best_train_sel_recall": best.evaluation.metrics.get("sel_recall"),
            "best_id": best.id, "best_depth": best.depth, "best_train_f1": f1_of(best), "best_train_em": best.evaluation.metrics["em"],
            "root_held": root_ev.metrics, "best_held": best_ev.metrics, "best_prompt": best.prompt.template,
            "proposed": len(proposed), "screened_out": len(screened), "gated": len(gated),
@@ -319,6 +326,7 @@ if __name__ == "__main__":
     ap.add_argument("--concurrency", type=int, default=16)
     ap.add_argument("--max-usd", type=float, default=4.0, help="hard cap on the whole experiment")
     ap.add_argument("--no-reasoning", action="store_true", help="answer-only schema (default: reasoning field before the answer)")
+    ap.add_argument("--program", action="store_true", help="two-stage program (tasks.hotpotqa.program): search the paragraph selector; rollouts count both stages' calls")
     ap.add_argument("--mock", action="store_true")
     ap.add_argument("--out", default="runs/hotpot")
     asyncio.run(main(ap.parse_args()))

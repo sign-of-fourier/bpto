@@ -9,6 +9,7 @@ from bpto import Dataset, MockClient
 from bpto.ops import Variants
 
 from . import Answer
+from .program import Titles
 
 CUES = ["two paragraphs", "step", "compare", "shortest", "copy", "yes / no", "distractor", "bridge"]
 
@@ -27,6 +28,8 @@ def _mock_client(dataset: Dataset, base: float = 0.35, per_cue: float = 0.08, **
                 j = (calls["variants"] * 3 + i) % len(CUES)
                 outs.append(f"{CUES[j]}. {base_t}" if (calls["variants"] + i) % 2 else f"{base_t} ({CUES[j]}, v{calls['variants']})")
             return Variants(prompts=outs)
+        if schema is Titles:
+            return Titles(titles=[m.group(1) for m in re.finditer(r"^([^\n:]{1,80}): ", prompt, re.M)][:2])
         q = re.search(r"Question: (.*)$", prompt.split("Respond with a single JSON")[0].strip(), re.S)
         question = q.group(1).strip() if q else ""
         template_cues = sum(c in prompt for c in CUES)
