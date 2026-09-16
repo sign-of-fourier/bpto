@@ -1,4 +1,4 @@
-# HotpotQA (distractor): GEPA vs BO vs 0-shot MIPRO, 3 seeds x 3,000 rollouts, train 200 (Nova Micro / Lite reflector, $4.1 total)
+# HotpotQA (distractor): GEPA vs BO vs 0-shot MIPRO, 3 seeds x 3,000 rollouts, train 200 (Nova Micro / Lite reflector, $6.5 total)
 
 First 25% of a planned 12-seed comparison (BACKLOG 4c), run to the pause point to answer "is there anything to
 find?" before spending the rest. Two passes: the original phase 1 (all three arms, $2.56), whose gepa/bo rows
@@ -30,6 +30,37 @@ gepa: Δ train +0.013 ± 0.003, Δ held **-0.017 ± 0.006**. bo: Δ train +0.015
   landscape that is all there is to see, and it is a small effect at n=3.
 
 ![clean trajectory](rerun_clean/trajectory.png)
+
+
+## Temperature-0 re-run (`rerun_t0/`, 2026-09-16, $2.4 incl. pilot) - the final word
+
+Every live run up to here evaluated at Nova's service default temperature 0.7 (`ModelConfig.temperature=None`
+sends nothing). Re-run of gepa and bo on seeds 0-2 with rollouts pinned to temperature 0 (`--eval-temperature`,
+now the harness default), plus the hand-variant pilot at temperature 0.
+
+| seed | arm | root train | best train | Δ train | root held | best held | Δ held | depth of best | accepted / gated |
+|---|---|---|---|---|---|---|---|---|---|
+| 0 | gepa | 0.730 | 0.734 | +0.004 | 0.699 | 0.698 | -0.001 | 2 | 13/58 |
+| 0 | bo | 0.734 | 0.734 | +0.000 | 0.703 | 0.703 | +0.000 | 0 (root) | 14/48 |
+| 1 | gepa | 0.750 | 0.750 | +0.000 | 0.661 | 0.661 | +0.000 | 0 (root) | 13/56 |
+| 1 | bo | 0.713 | 0.713 | +0.000 | 0.663 | 0.663 | +0.000 | 0 (root) | 14/39 |
+| 2 | gepa | 0.680 | 0.692 | +0.011 | 0.717 | 0.707 | -0.010 | 4 | 14/47 |
+| 2 | bo | 0.676 | 0.693 | +0.017 | 0.696 | 0.688 | -0.008 | 1 | 14/50 |
+
+gepa: Δ train +0.005 ± 0.003, Δ held -0.004 ± 0.003. bo: Δ train +0.006 ± 0.006, Δ held -0.003 ± 0.003.
+In 3 of 6 runs the best candidate *is the root*; 13-14 children per run reached the full 200 rows and every one of
+them scored at or below it (candidate range e.g. 0.597-0.734 around a root of 0.730). Flat, from both arms, at
+both temperatures.
+
+**Pilot at temperature 0** (`pilot_t0.md`): root 0.715; minimal -0.005 ± 0.014, cot -0.009 ± 0.018, span_rules
+-0.014 ± 0.017, persona -0.016 ± 0.015, two_hop -0.031 ± 0.017. The "-5 to -8 pts, all significant" at
+temperature 0.7 was sampling noise on top of a 1-3 pt real spread: six quite different prompts sit in a 3-pt band.
+
+**Temperature 0 is not deterministic on Bedrock Nova Micro.** The same root on the same 200 rows, evaluated once
+per arm: different output text on 109 / 119 / 116 of 200 rows (seeds 0/1/2), different F1 on 12 / 19 / 22, and a
+3.7-pt gap on seed 1 (0.750 vs 0.713). There is an irreducible ~1-4 pt noise floor per 200-row score that no
+sampling setting removes; only repeats or a noise-aware surrogate can. (Completions are cached, so a single run
+never sees its own variance - only cross-arm root comparisons expose it.)
 
 The rest of this note is the original phase 1, kept because the pilot and the MIPRO rows are valid and because
 the artefact is instructive.
@@ -100,3 +131,7 @@ selection, with nothing on held-out. Fix: split returned strings on
 4. Selection-strategy comparisons need a task where the mutator can actually move the score. Compression remains
    the only live task where that is true; a stronger task model (Lite/Pro) on HotpotQA might not be flat, but the
    research question is selection, not model size.
+5. Evaluation noise on Nova Micro is ~1-4 pts per 200-row score even at temperature 0. Any future comparison
+   must either re-measure incumbents (a child that beats its parent on the full set is evaluated again and must
+   beat it again) or feed per-node SE to the surrogate (`BOSelector(noise=...)`); "gain over root" from one
+   measurement of each is not a result.

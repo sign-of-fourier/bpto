@@ -28,7 +28,7 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 | 2026-09-11 | [Compression, GEPA vs BO, annealed F1 floor, 5 seeds x 600 rollouts, $0.065](2026-09-11-compression-gepa-vs-bo/) | Both arms compress 97 -> 5-26 tokens within 0.05 train F1 of the root. BO shorter on average (11.4 vs 17.2 tokens, paired +5.8 ± 5.1, 2/5 wins) but with lower held-out F1 (0.936 vs 0.958): not significant, and the shortest-feasible readout rewards overfitting a 30-example floor. Mechanics (floor moves, re-scoring, "new best" when the floor crosses) verified live. |
 | 2026-09-12 | [Compression v2, 12 seeds x 2,000 rollouts, train 100, minibatch 5, $0.41](2026-09-12-compression-v2-gepa-vs-bo/) | **Readout is the front graph.** BO's pooled (tokens, F1) front lies left of GEPA's at every accuracy level; per seed, at the accuracy the floor targeted (root - 0.05..0.10) BO is 3.5 tokens shorter (±2.0, 8-9/12 seeds). At stricter bars GEPA's pool hedges better because BO's value ignores accurate-but-not-shorter children. BO wasted 35% of rollouts on non-advancing full evals vs GEPA's 49%. |
 
-| 2026-09-15 | [HotpotQA-distractor, GEPA vs BO vs 0-shot MIPRO, 3 seeds x 3,000 rollouts, $4.1](2026-09-15-hotpotqa-phase1/) | **Flat.** After fixing a glued-template artefact (a doubled `{context}` was worth +2-9 pts held-out), gepa Δheld -0.017 ± 0.006, bo -0.001 ± 0.002, 0-shot MIPRO 0/16 candidates above root. Root beats 7 hand prompts by 5-8 pts. Stopped at the 25% pause: $4 instead of $12. |
+| 2026-09-15/16 | [HotpotQA-distractor, GEPA vs BO (+ 0-shot MIPRO), 3 seeds x 3,000 rollouts, $6.5](2026-09-15-hotpotqa-phase1/) | **Flat.** After fixing a glued-template artefact (a doubled `{context}` was worth +2-9 pts held-out) and pinning evaluation to temperature 0: gepa Δheld -0.004 ± 0.003, bo -0.003 ± 0.003, best = root in 3/6 runs; 0-shot MIPRO 0/16 above root; hand variants within 3 pts of root. Nova Micro is nondeterministic even at temperature 0 (F1 differs on 6-11% of rows between identical evaluations). Stopped at the 25% pause both times. |
 
 ## Standing conclusions
 
@@ -51,10 +51,13 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
   calls (3 children/round vs 1); the `gepa + 3 children, random keep-1` control is not yet run.
 - Gains reported on low-baseline models (Nova Micro) do not transfer proportionally to stronger models:
   a restatement fixes "cheap" failures that an 8B model has already absorbed.
-- HotpotQA-distractor on Nova Micro is flat, like IFBench: root F1 ~0.73, 5-8 pts above every hand-written variant,
-  and reflective search (gepa, bo) and 0-shot MIPRO all tie it on held-out. Train gains of +1-2.5 pts from picking
-  the best of ~15 candidates on 200 rows are winner's curse; Micro's nondeterminism adds ~2-4 pts of noise per
-  (prompt, 200-300 rows) score. Always run the $0.15 hand-variant pilot and the 25% pause before a full comparison.
+- HotpotQA-distractor on Nova Micro is flat, like IFBench: root F1 ~0.72, six hand-written variants within 3 pts,
+  reflective search (gepa, bo) and 0-shot MIPRO all tie it on held-out. Always run the $0.15 hand-variant pilot
+  (at temperature 0) and the 25% pause before a full comparison.
+- All live runs before 2026-09-16 evaluated at Nova's default temperature 0.7 (nothing was sent). Now pinned to 0 -
+  but Bedrock Nova Micro is still nondeterministic at 0 (F1 differs on 6-11% of rows between identical evaluations,
+  up to 3.7 pts on 200 rows). One measurement per candidate cannot resolve effects below ~3 pts: re-measure
+  incumbents or give the surrogate per-node SE.
 - Mutator hygiene matters more than selection on these tasks: a template that rendered `{context}` twice (Nova Lite
   glued two templates) beat every genuine instruction change. The expander now requires each placeholder exactly once.
 - Reference points from the GEPA paper (Agrawal et al. 2025), Qwen3-8B, test accuracy %:

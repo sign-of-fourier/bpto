@@ -189,7 +189,7 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
     train, rest = full_data.split(args.n_train / len(full_data), seed=seed)
     held = rest.sample(args.holdout, seed=seed)
     client, reflect_client = make_clients(args, None if args.mock else CompletionCache(out / "cache.jsonl"), global_budget, full_data)
-    task = make_task(client, train, config=ModelConfig(max_tokens=args.max_tokens), reasoning=not args.no_reasoning, expander_client=reflect_client,
+    task = make_task(client, train, config=ModelConfig(max_tokens=args.max_tokens, temperature=args.eval_temperature), reasoning=not args.no_reasoning, expander_client=reflect_client,
                      expander_config=ModelConfig(max_tokens=2048, temperature=args.reflect_temperature))
     tree = Tree(task)
     EventLog(out / "events.jsonl", tree)
@@ -313,6 +313,7 @@ if __name__ == "__main__":
     ap.add_argument("--full-every", type=int, default=10, help="MIPRO: full-evaluate the best-by-mean candidate every k trials")
     ap.add_argument("--max-tokens", type=int, default=512)
     ap.add_argument("--reflect-temperature", type=float, default=1.0)
+    ap.add_argument("--eval-temperature", type=float, default=0.0, help="task-model temperature for rollouts (Nova default is 0.7; runs before 2026-09-16 used it)")
     ap.add_argument("--model", default="us.amazon.nova-micro-v1:0")
     ap.add_argument("--reflect-model", default="us.amazon.nova-lite-v1:0")
     ap.add_argument("--concurrency", type=int, default=16)

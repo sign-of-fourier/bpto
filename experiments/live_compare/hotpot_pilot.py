@@ -58,7 +58,7 @@ async def main(args):
         client = BedrockClient(args.model, region=os.environ.get("AWS_REGION", "us-east-1"), max_concurrency=16,
                                cache=CompletionCache(out / "cache.jsonl"),
                                budget=Budget(max_calls=len(VARIANTS) * args.rows + 100, max_usd=args.max_usd))
-    task = make_task(client, data, config=ModelConfig(max_tokens=args.max_tokens), reasoning=args.reasoning)
+    task = make_task(client, data, config=ModelConfig(max_tokens=args.max_tokens, temperature=0.0), reasoning=args.reasoning)
     tree = Tree(task)
     rows = []
     for name, tmpl in VARIANTS.items():

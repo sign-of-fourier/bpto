@@ -200,7 +200,7 @@ async def run_one(arm, seed, args, full_data, global_budget, cache, embedder):
     # cache per arm-seed: a shared file would hand the second arm its root evaluation for free
     client, reflect_client = make_clients(args, None if args.mock else CompletionCache(out / "cache.jsonl"), global_budget)
     floor = Floor(args.start_gap, args.end_gap, args.step, args.every)
-    task = make_task(client, train, objective=make_objective(floor), config=ModelConfig(max_tokens=512),
+    task = make_task(client, train, objective=make_objective(floor), config=ModelConfig(max_tokens=512, temperature=args.eval_temperature),
                      expander_client=reflect_client, expander_config=ModelConfig(max_tokens=2048, temperature=args.reflect_temperature))
     tree = Tree(task)
     EventLog(out / "events.jsonl", tree)
@@ -325,6 +325,7 @@ if __name__ == "__main__":
     ap.add_argument("--step", type=float, default=0.02, help="floor increase per `every` rollouts")
     ap.add_argument("--every", type=int, default=100)
     ap.add_argument("--reflect-temperature", type=float, default=1.0)
+    ap.add_argument("--eval-temperature", type=float, default=0.0, help="task-model temperature for rollouts (Nova default is 0.7; runs before 2026-09-16 used it)")
     ap.add_argument("--model", default="us.amazon.nova-micro-v1:0")
     ap.add_argument("--reflect-model", default="us.amazon.nova-lite-v1:0")
     ap.add_argument("--concurrency", type=int, default=16)
