@@ -39,8 +39,9 @@ class GPR:
 
         if len(X) > 1:
             d = np.sqrt(np.maximum(np.sum((X[:, None, :] - X[None, :, :]) ** 2, -1), 0))
-            med = float(np.median(d[np.triu_indices(len(X), 1)]))
-            med = med if med > 1e-6 else 1.0  # (near-)identical inputs: don't collapse the lengthscale
+            dd = d[np.triu_indices(len(X), 1)]
+            dd = dd[dd > 1e-6]  # repeated inputs (several observations at one x) must not drag the scale to zero
+            med = float(np.median(dd)) if len(dd) else 1.0
         else:
             med = 1.0
         ells = [self.lengthscale] if self.lengthscale else list(med * np.logspace(-1, 1, self.grid))

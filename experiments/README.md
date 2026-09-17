@@ -37,7 +37,27 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 
 | 2026-09-16 | [HotpotQA selector program, BO without the minibatch, 3 seeds, $0.80](2026-09-16-hotpotqa-bo-pure/) | **First bo arm not below zero.** GP trains on full evaluations only, PIT targets, EI incumbent = best posterior expectation, parent value = own score (the descendant target locked EI onto one parent: ladder 0.50 vs 0.995). Held ΔF1 +.019 ± .016 (gepa same seeds +.010 ± .019), held selection recall up in 3/3 seeds (+.029 ± .008 vs gepa ± .035). Ladder: beats gepa-weighted at baseline (450 vs 483 rollouts), under noise (0.887 vs 0.836) and with a weak mutator (1.000 vs 0.836). |
 
+| 2026-09-17 | [HotpotQA selector program, GEPA vs bo-pure, 12 seeds x 3,000 rollouts, $5.33](2026-09-17-hotpotqa-12-seeds/) | **The 3-seed bo-pure lead does not replicate.** gepa held +.020 ± .004, bo-pure +.004 ± .004; paired −.016 ± .007, p = .04, gepa ahead 9/12. The surrogate child screen picks children that beat the parent 27% of the time = the mutator's base rate; GEPA's 5-row gate lets through children that beat the parent on the full set 51% of the time and sees twice the proposals. |
+| 2026-09-17 | [Heritability of the landscape, parent-offspring regression over 3 tree families, $0](2026-09-17-heritability/) | HotpotQA F1 pooled r ≈ .8 is "broken begets broken": among parents ≥ root, r ≈ .05 (gated) / .5 (bo-pure), P(child ≥ root) .5-.8, mean child 1 pt below its parent, no lineage climbing beyond depth 2. **Level-heritable, stacking not demonstrated.** Compression F1 not heritable (r .3 / .06). Noise floor .01 at 200 rows. |
+| 2026-09-17 | [All-evaluated tree (`botree`), 4 runs, 15 seeds, $4.5](2026-09-17-hotpotqa-botree/) | Best-child target locks on (fit frozen at 9 obs). Every-child-as-observation (`value` → list) breaks the lock; EI then flat because 256-d Titan distances concentrate (nearest/median .40, ℓ ≈ 10 vs distances ≤ 1.4). **`BOSelector(pca=4)` restores contrast** (ℓ → 1-2, EI spread 10×). At 25 rows held −.014/−.026/−.007; at **50 rows, 6 seeds: +.010 ± .011**, 5/6 up, winners are mostly root's best-of-n children. Sibling ICC .0-.58 by seed. |
+| 2026-09-17 | [`gepaei`: GEPA with EI in the expand seat only, 6 + 3 seeds paired with gepa, $1.4; ladder control $0](2026-09-17-hotpotqa-gepaei/) | Gain-over-parent target expands the weakest node (v1 −.017 ± .010 vs gepa); estimated-child-F1 target fixes that, still −.009 ± .005 (n = 3). EI ≈ 0 everywhere when no parent's expected child beats the incumbent. **Ladder: gepaei .947 vs gepa-weighted .962 vs uniform .830; under noise .901 vs .867** - the arm works where selection is known to matter; on HotpotQA the sampler is already ≈ uniform-optimal. |
+
 ## Standing conclusions
+
+- **Two selections, two seats (2026-09-17).** "Select to expand" (which pool member the reflector works on) and
+  "select to survive" (which proposal earns a full evaluation) are different decisions. A surrogate in the survive seat
+  with no observations at the proposals' inputs is at the mutator's base rate; GEPA's paired 5-row gate is the better
+  cheap filter there (51% vs 27%). BO's seat is expand. On HotpotQA GEPA's expand sampler is ≈ uniform (equal per-row
+  wins across a ~11-node pool) and three EI variants tie or trail it; on the ladder, where the pool spans 0-1, EI ≈
+  the weighted sampler and is nominally ahead under noise. The selector is only as good as the signal per observation.
+- **Embedding dimensionality is a signal-to-noise problem at small n.** Raw 256-d Titan vectors: every prompt about
+  equally far from every other, a single-lengthscale GP goes flat with tens of inputs. `BOSelector(pca=k)`, k ≈ 4-8,
+  refit per call on fit ∪ candidate rows, restores contrast; ARD when rows ≫ dims; an isotropic kernel on raw
+  embeddings is never sufficient on its own. Product rule (BACKLOG "Product (2.0)").
+- **Repeated observations at one input** (`value` returning a list: every child's score at the parent's embedding)
+  is the supported way to learn a node's expected yield and spread; a scalar `max` over descendants locks the search
+  onto one parent. Rows per evaluation: 25 cannot rank the top on HotpotQA (train winners lose held-out); 50 is
+  where the pick starts to transfer (+.010 ± .011, 6 seeds).
 
 - **Heritability is a property of the landscape, not of optimisers.** Genetic search (Pareto pool + mutate the best,
   GEPA) wins where a good node's children are good - the synthetic ladder is built that way, and greedy "expand the best"
@@ -53,7 +73,6 @@ arm reads its reflection minibatch from the parent's cached evaluation, so it is
 - IFBench is a flat landscape for prompt search at every model size published (GEPA: +1.7 on Qwen3-8B,
   +8 on GPT-4.1 Mini; MIPROv2 ~0). With 300 rows, a +2 pt effect is undetectable. Use it as a plumbing /
   flat-landscape stress test, not as the benchmark that decides between BO and GEPA-style selection.
-- No live run has yet exercised `BOSelector` or a real embedder; all BO evidence is synthetic.
 - Live: the reflector's willingness to make substantive edits is the binding constraint on every selection
   strategy. Nova Lite paraphrases; test a forced-structure prompt / Pro before comparing selectors again.
 - Synthetic ladder: the *weighting* in GEPA's sampler is what works; its randomness is not. BO's clearest

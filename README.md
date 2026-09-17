@@ -11,8 +11,14 @@ prompt embeddings.
   BO plugs in as one more selector.
 - **Scores are vectors.** A `Scorer` returns per-example metrics; an `Objective` turns the
   aggregated vector into a scalar (linear, constrained-with-depth, …) and is cheap to swap.
-- **Ancestor attribution.** `DescendantValue(generations=2, agg=max)` values a node by its
-  best grandchild — the target BO learns from.
+- **Ancestor attribution.** `DescendantValue(generations=1, agg=list)` gives BO every child score as
+  an observation at the parent's input, so the surrogate learns a node's expected yield and its spread.
+  (`agg=max` — "best child/grandchild" — is also available but rewards a node for having been expanded and
+  can lock the search onto it.)
+- **Embeddings are high-dimensional, observations are few.** `BOSelector(pca=k)` projects to the top-k
+  directions of the current pool before the kernel sees them; without it a single-lengthscale GP on 256-d
+  text embeddings goes flat (every prompt equally far from every other). Use it whenever distinct training
+  inputs are tens, not hundreds.
 
 ## Example: question answering with an LLM judge
 
@@ -60,7 +66,8 @@ to run against vLLM/Ollama/OpenRouter/OpenAI; or subclass `ModelClient` and impl
 from bpto import DescendantValue
 from bpto.bo import BOSelector, VoyageEmbedder, GPR, EI
 
-bo = BOSelector(VoyageEmbedder(), GPR(), EI(), value=DescendantValue(generations=2, agg=max))
+bo = BOSelector(VoyageEmbedder(), GPR(), EI(), value=DescendantValue(generations=1, agg=list),
+                transform="pit", pca=4)
 for _ in range(10):
     await tree.apply(random(n=4),              select=bo.top(k=2, among=select.unexpanded))
     await tree.apply(guided("more accurate", n=3), select=select.leaves)
@@ -74,7 +81,7 @@ operator with different directives; a pipeline just strings purposes together:
 ```python
 from bpto import Pipeline, SubtreeValue
 expand = Pipeline([random(3), guided("be more precise", 2), guided("be shorter", 2), evaluate()])
-bo = BOSelector(VoyageEmbedder(), GPR(), EI(), value=SubtreeValue(max))   # best leaf of the subtree
+bo = BOSelector(VoyageEmbedder(), GPR(), EI(), value=SubtreeValue(list), pca=4)   # every leaf of the subtree
 for _ in range(10):
     await tree.apply(expand, select=bo.top(k=2, among=select.unexpanded))
 ```
@@ -159,7 +166,7 @@ bpto/
   search.py   run(tree, schedule, Stop, checkpoint), successive_halving
   observe.py  EventLog (JSONL), Progress (stderr), tree_text / tree_dot / plot_tree / lineage
   select.py   leaves, unevaluated, unexpanded, depth, top_k, pareto, union
-  value.py    DescendantValue (fixed generation), SubtreeValue (any depth, optional pipeline-only attribution)
+  value.py    DescendantValue (fixed generation), SubtreeValue (any depth, optional pipeline-only attribution); agg=list -> one observation per descendant
   bo/         BOSelector; GPR (numpy); EI / UCB / Thompson; Voyage / OpenAI / Azure / Bedrock / Hash embedders
   gepa/       simplified GEPA: Pareto-pool selector (pareto_sample), ReflectiveExpander, gepa() schedule
 tasks/compression/   example downstream task (will move to its own repo) — see its README

@@ -8,7 +8,11 @@ from .tree import Node, Tree
 
 
 class Value(Protocol):
-    def __call__(self, node: Node, tree: Tree) -> float | None: ...
+    """One target per node, or a list of them (`agg=list`): every descendant score becomes its own observation at
+    the node's input, which is how `BOSelector` learns a node's expected yield *and* its spread (repeated
+    observations at one x). A scalar aggregate such as `max` rewards a node for having been expanded and can lock
+    the search onto it (`runs/hotpot_botree`, 2026-09-17)."""
+    def __call__(self, node: Node, tree: Tree) -> float | list[float] | None: ...
 
 
 class DescendantValue:
@@ -19,7 +23,7 @@ class DescendantValue:
     is simply absent from a BO training set.
     """
 
-    def __init__(self, generations: int = 0, agg: Callable[[list[float]], float] = max,
+    def __init__(self, generations: int = 0, agg: Callable[[list[float]], float | list[float]] = max,
                  feasible_only: bool = False, op: str | None = None):
         self.generations, self.agg, self.feasible_only, self.op = generations, agg, feasible_only, op
 
@@ -39,7 +43,7 @@ class SubtreeValue:
     is a pipeline of unknown/variable depth. `include_self` counts the node's own score too.
     `pipeline_only` restricts to nodes created by a Pipeline rooted at this node."""
 
-    def __init__(self, agg: Callable[[list[float]], float] = max, include_self: bool = False,
+    def __init__(self, agg: Callable[[list[float]], float | list[float]] = max, include_self: bool = False,
                  feasible_only: bool = False, pipeline_only: bool = False):
         self.agg, self.include_self, self.feasible_only, self.pipeline_only = agg, include_self, feasible_only, pipeline_only
 
@@ -58,4 +62,5 @@ own_score = DescendantValue(0)
 best_descendant = SubtreeValue(max)
 best_child = DescendantValue(1, max)
 best_grandchild = DescendantValue(2, max)
+child_scores = DescendantValue(1, list)  # every child as an observation: the recommended expansion-selection target
 mean_grandchild = DescendantValue(2, mean)

@@ -1,0 +1,96 @@
+
+=== hotpot_program (gepa+bo, gated): 6 runs ===
+[f1] noise floor from repeated root evals: 3 seeds x [2, 2, 2] repeats; pooled SD = 0.0098  (per-seed SDs 0.0165, 0.0011, 0.0039); rows differing between identical evals: 8.5%
+[f1] 88 parent->child full-eval pairs (of 88 non-root full evals); parents: 36; parent-score SD 0.0408; child-score SD 0.0445
+[f1]   child on parent (root-centered):  slope +0.836 ± 0.076   r = +0.766   Spearman ρ = +0.673
+[f1]   depth ≤ 2 only (61 pairs):       slope +0.828 ± 0.104   r = +0.719
+[f1]   reliability of parent score 1 - σ²_noise/σ²_parent = 0.94  -> disattenuated slope +0.887
+[f1]   child - parent: mean -0.0121, SD 0.0294  (pure noise would give SD ≈ √2·σ_noise = 0.0139); P(child > parent) = 0.35; P(child > parent + 2σ_noise) = 0.07
+[f1]   sibling ICC over 20 parents with ≥2 full-eval children (72 children): +0.715  (within-family SD 0.0253)
+[f1]   best-of-children on parent: slope +0.901 ± 0.104  r = +0.830; mean(best child - parent) +0.0007; children/parent median 2
+[f1]   pairs by child depth: d1:16, d2:45, d3:10, d4:8, d5:5, d6:3, d7:1
+[f1]   per run: bo-s0: n=15 b=+0.42 r=+0.52 | bo-s1: n=14 b=+0.94 r=+0.36 | bo-s2: n=15 b=+0.44 r=+0.28 | gepa-s0: n=15 b=+0.65 r=+0.67 | gepa-s1: n=14 b=+0.42 r=+0.40 | gepa-s2: n=15 b=+0.93 r=+0.57
+[sel_recall] noise floor from repeated root evals: 3 seeds x [2, 2, 2] repeats; pooled SD = 0.0046  (per-seed SDs 0.0035, 0.0071, 0.0000); rows differing between identical evals: 4.5%
+[sel_recall] 88 parent->child full-eval pairs (of 88 non-root full evals); parents: 36; parent-score SD 0.0703; child-score SD 0.0798
+[sel_recall]   child on parent (root-centered):  slope +0.813 ± 0.085   r = +0.716   Spearman ρ = +0.706
+[sel_recall]   depth ≤ 2 only (61 pairs):       slope +0.837 ± 0.121   r = +0.670
+[sel_recall]   reliability of parent score 1 - σ²_noise/σ²_parent = 1.00  -> disattenuated slope +0.817
+[sel_recall]   child - parent: mean -0.0239, SD 0.0572  (pure noise would give SD ≈ √2·σ_noise = 0.0065); P(child > parent) = 0.31; P(child > parent + 2σ_noise) = 0.26
+[sel_recall]   sibling ICC over 20 parents with ≥2 full-eval children (72 children): +0.565  (within-family SD 0.0547)
+[sel_recall]   best-of-children on parent: slope +0.901 ± 0.107  r = +0.822; mean(best child - parent) +0.0028; children/parent median 2
+[sel_recall]   pairs by child depth: d1:16, d2:45, d3:10, d4:8, d5:5, d6:3, d7:1
+[sel_recall]   per run: bo-s0: n=15 b=+0.44 r=+0.53 | bo-s1: n=14 b=-0.15 r=-0.04 | bo-s2: n=15 b=+0.47 r=+0.34 | gepa-s0: n=15 b=+0.79 r=+0.78 | gepa-s1: n=14 b=+0.33 r=+0.23 | gepa-s2: n=15 b=+2.35 r=+0.65
+
+=== hotpot_program3 (bo pure, no gate): 3 runs ===
+[f1] no repeated root evals
+[f1] 50 parent->child full-eval pairs (of 50 non-root full evals); parents: 26; parent-score SD 0.0250; child-score SD 0.0335
+[f1]   child on parent (root-centered):  slope +1.073 ± 0.116   r = +0.800   Spearman ρ = +0.690
+[f1]   depth ≤ 2 only (16 pairs):       slope +0.998 ± 0.283   r = +0.686
+[f1]   child - parent: mean -0.0088, SD 0.0202  (pure noise would give SD ≈ √2·σ_noise = nan); P(child > parent) = 0.26; P(child > parent + 2σ_noise) = 0.00
+[f1]   sibling ICC over 13 parents with ≥2 full-eval children (37 children): +0.679  (within-family SD 0.0171)
+[f1]   best-of-children on parent: slope +1.066 ± 0.134  r = +0.852; mean(best child - parent) -0.0029; children/parent median 2
+[f1]   pairs by child depth: d1:6, d2:10, d3:7, d4:9, d5:4, d6:9, d7:5
+[f1]   per run: bo-s0: n=17 b=+0.98 r=+0.71 | bo-s1: n=16 b=+1.14 r=+0.92 | bo-s2: n=17 b=+0.77 r=+0.49
+[sel_recall] no repeated root evals
+[sel_recall] 50 parent->child full-eval pairs (of 50 non-root full evals); parents: 26; parent-score SD 0.0672; child-score SD 0.0785
+[sel_recall]   child on parent (root-centered):  slope +0.957 ± 0.097   r = +0.819   Spearman ρ = +0.790
+[sel_recall]   depth ≤ 2 only (16 pairs):       slope +0.815 ± 0.244   r = +0.665
+[sel_recall]   child - parent: mean -0.0162, SD 0.0451  (pure noise would give SD ≈ √2·σ_noise = nan); P(child > parent) = 0.40; P(child > parent + 2σ_noise) = 0.00
+[sel_recall]   sibling ICC over 13 parents with ≥2 full-eval children (37 children): +0.680  (within-family SD 0.0427)
+[sel_recall]   best-of-children on parent: slope +1.027 ± 0.094  r = +0.913; mean(best child - parent) -0.0012; children/parent median 2
+[sel_recall]   pairs by child depth: d1:6, d2:10, d3:7, d4:9, d5:4, d6:9, d7:5
+[sel_recall]   per run: bo-s0: n=17 b=+1.18 r=+0.81 | bo-s1: n=16 b=+0.85 r=+0.81 | bo-s2: n=17 b=+0.62 r=+0.50
+
+=== compress_v2 (gepa+bo, gated): 24 runs ===
+[f1] noise floor from repeated root evals: 12 seeds x [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] repeats; pooled SD = 0.0091  (per-seed SDs 0.0094, 0.0118, 0.0094, 0.0000, 0.0035, 0.0035, 0.0000, 0.0071, 0.0106, 0.0059, 0.0177, 0.0118); rows differing between identical evals: 2.3%
+[f1] 467 parent->child full-eval pairs (of 467 non-root full evals); parents: 157; parent-score SD 0.0576; child-score SD 0.0772
+[f1]   child on parent (root-centered):  slope +0.406 ± 0.059   r = +0.303   Spearman ρ = +0.206
+[f1]   depth ≤ 2 only (277 pairs):       slope +0.209 ± 0.115   r = +0.109
+[f1]   reliability of parent score 1 - σ²_noise/σ²_parent = 0.98  -> disattenuated slope +0.416
+[f1]   child - parent: mean -0.0489, SD 0.0811  (pure noise would give SD ≈ √2·σ_noise = 0.0128); P(child > parent) = 0.22; P(child > parent + 2σ_noise) = 0.15
+[f1]   sibling ICC over 66 parents with ≥2 full-eval children (376 children): +0.293  (within-family SD 0.0633)
+[f1]   best-of-children on parent: slope +0.711 ± 0.064  r = +0.668; mean(best child - parent) -0.0085; children/parent median 1
+[f1]   pairs by child depth: d1:92, d2:185, d3:90, d4:29, d5:52, d6:7, d7:7, d8:3, d9:1, d10:1
+[f1]   per run: bo-s0: n=20 b=+0.14 r=+0.10 | bo-s1: n=19 b=+0.41 r=+0.40 | bo-s10: n=19 b=-8.93 r=-0.68 | bo-s11: n=19 b=+0.16 r=+0.10 | bo-s2: n=18 b=-36.08 r=-0.43 | bo-s3: n=18 b=+0.50 r=+0.44 | bo-s4: n=19 b=+0.17 r=+0.10 | bo-s5: n=19 b=+0.55 r=+0.30 | bo-s6: n=19 b=+0.71 r=+0.70 | bo-s7: n=19 b=+0.63 r=+0.58 | bo-s8: n=19 b=+0.42 r=+0.40 | bo-s9: n=18 b=+0.78 r=+0.56 | gepa-s0: n=19 b=-0.83 r=-0.25 | gepa-s1: n=31 b=-1.06 r=-0.20 | gepa-s10: n=19 b=+1.42 r=+0.52 | gepa-s11: n=19 b=-12.53 r=-0.30 | gepa-s2: n=19 b=+0.16 r=+0.12 | gepa-s3: n=19 b=-1.95 r=-0.36 | gepa-s4: n=19 b=-4.20 r=-0.32 | gepa-s5: n=19 b=+0.16 r=+0.15 | gepa-s6: n=19 b=+nan r=+nan | gepa-s7: n=19 b=-3.21 r=-0.20 | gepa-s8: n=19 b=-0.12 r=-0.10 | gepa-s9: n=20 b=-0.78 r=-0.30
+[template_tokens] noise floor from repeated root evals: 12 seeds x [2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2, 2] repeats; pooled SD = 0.0000  (per-seed SDs 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000, 0.0000); rows differing between identical evals: 0.0%
+[template_tokens] 467 parent->child full-eval pairs (of 467 non-root full evals); parents: 157; parent-score SD 30.5507; child-score SD 13.9747
+[template_tokens]   child on parent (root-centered):  slope +0.315 ± 0.015   r = +0.690   Spearman ρ = +0.725
+[template_tokens]   depth ≤ 2 only (277 pairs):       slope +0.285 ± 0.024   r = +0.578
+[template_tokens]   reliability of parent score 1 - σ²_noise/σ²_parent = 1.00  -> disattenuated slope +0.315
+[template_tokens]   child - parent: mean -19.5722, SD 23.2325  (pure noise would give SD ≈ √2·σ_noise = 0.0000); P(child > parent) = 0.03; P(child > parent + 2σ_noise) = 0.03
+[template_tokens]   sibling ICC over 66 parents with ≥2 full-eval children (376 children): +0.566  (within-family SD 9.6215)
+[template_tokens]   best-of-children on parent: slope +0.444 ± 0.024  r = +0.831; mean(best child - parent) -13.1353; children/parent median 1
+[template_tokens]   pairs by child depth: d1:92, d2:185, d3:90, d4:29, d5:52, d6:7, d7:7, d8:3, d9:1, d10:1
+[template_tokens]   per run: bo-s0: n=20 b=+0.15 r=+0.52 | bo-s1: n=19 b=+0.41 r=+0.82 | bo-s10: n=19 b=+0.36 r=+0.75 | bo-s11: n=19 b=+0.34 r=+0.92 | bo-s2: n=18 b=+0.15 r=+0.71 | bo-s3: n=18 b=+0.47 r=+0.95 | bo-s4: n=19 b=+0.25 r=+0.52 | bo-s5: n=19 b=+0.18 r=+0.54 | bo-s6: n=19 b=+0.23 r=+0.72 | bo-s7: n=19 b=+0.15 r=+0.70 | bo-s8: n=19 b=+0.25 r=+0.56 | bo-s9: n=18 b=+0.28 r=+0.84 | gepa-s0: n=19 b=+0.36 r=+0.78 | gepa-s1: n=31 b=+0.33 r=+0.71 | gepa-s10: n=19 b=+0.37 r=+0.62 | gepa-s11: n=19 b=+0.34 r=+0.38 | gepa-s2: n=19 b=+0.29 r=+0.59 | gepa-s3: n=19 b=+0.38 r=+0.77 | gepa-s4: n=19 b=+0.18 r=+0.59 | gepa-s5: n=19 b=+0.14 r=+0.39 | gepa-s6: n=19 b=+nan r=+nan | gepa-s7: n=19 b=+0.12 r=+0.41 | gepa-s8: n=19 b=+0.30 r=+0.70 | gepa-s9: n=20 b=+0.45 r=+0.63
+
+=== split by parent vs root ===
+
+hotpot_program f1: 88 pairs, noise σ=0.0098
+  parent ≥ root (Δ≥0)    n= 47  parent mean Δ +0.0065  child mean Δ -0.0102  slope +0.38 r +0.09  P(child ≥ root) 0.53  P(child ≥ parent) 0.38
+  parent < root          n= 41  parent mean Δ -0.0567  child mean Δ -0.0636  slope +0.84 r +0.83  P(child ≥ root) 0.10  P(child ≥ parent) 0.32
+  parent ≥ root+σ        n= 13  parent mean Δ +0.0179  child mean Δ -0.0068  slope +0.40 r +0.05  P(child ≥ root) 0.62  P(child ≥ parent) 0.23
+  parent ≥ root+2σ       n=  6  parent mean Δ +0.0226  child mean Δ -0.0025  slope +59.24 r +0.75  P(child ≥ root) 0.50  P(child ≥ parent) 0.17
+
+hotpot_program recall: 88 pairs, noise σ=0.0046
+  parent ≥ root (Δ≥0)    n= 24  parent mean Δ +0.0037  child mean Δ -0.0279  slope +0.32 r +0.04  P(child ≥ root) 0.38  P(child ≥ parent) 0.38
+  parent < root          n= 64  parent mean Δ -0.0851  child mean Δ -0.1061  slope +0.79 r +0.74  P(child ≥ root) 0.05  P(child ≥ parent) 0.34
+  parent ≥ root+σ        n=  4  parent mean Δ +0.0225  child mean Δ +0.0056  slope -3.65 r -0.57  P(child ≥ root) 0.75  P(child ≥ parent) 0.75
+  parent ≥ root+2σ       n=  4  parent mean Δ +0.0225  child mean Δ +0.0056  slope -3.65 r -0.57  P(child ≥ root) 0.75  P(child ≥ parent) 0.75
+
+hotpot_program3 f1: 50 pairs, noise σ=0.0098
+  parent ≥ root (Δ≥0)    n= 40  parent mean Δ +0.0153  child mean Δ +0.0070  slope +1.05 r +0.49  P(child ≥ root) 0.78  P(child ≥ parent) 0.25
+  parent < root          n= 10  parent mean Δ -0.0372  child mean Δ -0.0476  slope +1.29 r +0.79  P(child ≥ root) 0.20  P(child ≥ parent) 0.30
+  parent ≥ root+σ        n= 27  parent mean Δ +0.0210  child mean Δ +0.0143  slope +0.40 r +0.25  P(child ≥ root) 0.93  P(child ≥ parent) 0.19
+  parent ≥ root+2σ       n=  9  parent mean Δ +0.0300  child mean Δ +0.0182  slope +0.19 r +0.19  P(child ≥ root) 1.00  P(child ≥ parent) 0.11
+
+hotpot_program3 recall: 50 pairs, noise σ=0.0046
+  parent ≥ root (Δ≥0)    n= 41  parent mean Δ +0.0216  child mean Δ +0.0029  slope +1.41 r +0.51  P(child ≥ root) 0.73  P(child ≥ parent) 0.37
+  parent < root          n=  9  parent mean Δ -0.1367  child mean Δ -0.1411  slope +1.07 r +0.78  P(child ≥ root) 0.00  P(child ≥ parent) 0.67
+  parent ≥ root+σ        n= 32  parent mean Δ +0.0276  child mean Δ +0.0149  slope +1.01 r +0.56  P(child ≥ root) 0.75  P(child ≥ parent) 0.28
+  parent ≥ root+2σ       n= 32  parent mean Δ +0.0276  child mean Δ +0.0149  slope +1.01 r +0.56  P(child ≥ root) 0.75  P(child ≥ parent) 0.28
+
+compress_v2 f1: 467 pairs, noise σ=0.0091
+  parent ≥ root (Δ≥0)    n=288  parent mean Δ +0.0098  child mean Δ -0.0632  slope +0.42 r +0.06  P(child ≥ root) 0.23  P(child ≥ parent) 0.10
+  parent < root          n=179  parent mean Δ -0.0733  child mean Δ -0.0835  slope +0.57 r +0.49  P(child ≥ root) 0.08  P(child ≥ parent) 0.46
+  parent ≥ root+σ        n=122  parent mean Δ +0.0203  child mean Δ -0.0557  slope +0.77 r +0.07  P(child ≥ root) 0.34  P(child ≥ parent) 0.07
+  parent ≥ root+2σ       n= 73  parent mean Δ +0.0244  child mean Δ -0.0690  slope +5.95 r +0.40  P(child ≥ root) 0.32  P(child ≥ parent) 0.00

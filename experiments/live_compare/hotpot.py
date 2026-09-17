@@ -10,11 +10,23 @@ interrupted arm-seed pays only for what it had not already done.
 
 Arms (same root, train split, reflector model, minibatch, gate and rollout budget):
     gepa   Pareto pool on per-example F1, sample ∝ wins, 1 reflected child/round, minibatch gate (child > parent).
+    gepaei selection-only test (user, 2026-09-17): gepa's expansion verbatim (1 child, minibatch gate, full eval on pass)
+           but the node to expand is chosen by EI (GEPA sampler for `warmup` rounds). The GP trains on EVERY proposal:
+           one observation per child at the parent's input = the child's paired gain over the parent on the child's
+           own rows (5-row for gate failures, full train for passers), per-observation F1 SE. Supersedes the
+           2026-09-16 "never train on minibatch scores" rule for this arm.
     gepa3  control: as gepa but 3 children/round, keep 1 at random - isolates "more proposals" from "surrogate picks".
     bo     no minibatch. EI over the candidates with value = the candidate's own full-train F1 (GEPA sampler until
            `warmup` candidates have been expanded), 3 reflected children, surrogate keeps 1 and it gets the full train set.
            The GP trains on full evaluations only (never on minibatch scores); targets PIT-transformed
            (`--bo-transform`), per-node noise = F1 SE. `--bo-gate minibatch` restores the old two-filter schedule.
+    botree no screen, no minibatch (user design, 2026-09-17). Every fully evaluated node - root, expanded parents, leaves -
+           is a candidate; EI picks one (GEPA sampler until `warmup` nodes have children); 3 reflected children, ALL of
+           them get the full train set. One expansion = one GP observation: target = best full-train F1 among the
+           parent's children (`--botree-target best`; locked onto one parent, 2026-09-17) or, default, EVERY child's F1
+           as its own observation at the parent's input (`children`: the GP learns the parent's expected yield and
+           the mutator's spread as its noise term), noise = the child's F1 SE, PIT-transformed. Convergence is
+           logged per expansion (`bo_fits`: parent, its score, mu/var/EI, the children's scores, best so far).
     mipro  MIPROv2 (0-shot): N grounded instruction candidates proposed once from the root, then categorical TPE
            trials on minibatches (evaluations accumulate, so a candidate's coverage grows toward the full set),
            and every `full_every` trials the best-by-mean candidate gets the full train set. No feedback, no tree growth.
@@ -42,6 +54,7 @@ from pathlib import Path
 from bpto import Budget, CompletionCache, Dataset, EventLog, ModelConfig, Origin, Stop, Tree, evaluate, run, select
 from bpto.bo import EI, GPR, AdditiveGPR, BOSelector, HashEmbedder
 from bpto.gepa import ReflectiveExpander, beats_parent, candidates, pareto_sample
+from bpto.gepa.select import example_scores
 from bpto.gepa.loop import minibatch_for
 from bpto.mipro import CategoricalTPE, GroundedProposer, dataset_summary
 from bpto.search import step
@@ -51,7 +64,7 @@ from tasks.hotpotqa.program import make_program_task
 
 from .compare import load_env
 
-ARMS = ["gepa", "bo", "mipro"]
+ARMS = ["gepa", "bo", "mipro"]  # also: gepa3, gepaei, botree
 
 
 def f1_of(n) -> float | None:
@@ -81,6 +94,41 @@ def full_value(node, tree) -> float | None:
 def best_full_child_value(node, tree) -> float | None:
     vals = [f1_of(c) for c in tree.child_nodes(node) if is_full(c, tree)]
     return max(vals) if vals else None
+
+
+def child_gains(node, tree) -> list[float] | None:
+    """gepaei target: every evaluated child's ESTIMATED full-train F1, one observation per proposal at the parent's input:
+    parent's full-train F1 + (child − parent on the child's own rows). The paired difference cancels row difficulty (a
+    gate failure was only ever scored on its 5 minibatch rows); adding the parent's full F1 makes it absolute. v1
+    (2026-09-17, 6 seeds, −.017 vs gepa) used the bare gain, which rewards weak parents - EI expanded the pool's
+    lowest node 41 times in seed 5."""
+    ps = example_scores(tree, node, metric="f1")
+    if not ps:
+        return None
+    parent_full = f1_of(node)
+    out = []
+    for c in tree.child_nodes(node):
+        if c.evaluation is None or not all(i in ps for i in c.evaluation.dataset_ids):
+            continue
+        ids = c.evaluation.dataset_ids
+        out.append(parent_full + c.evaluation.metrics.get("f1", 0.0) - sum(ps[i] for i in ids) / max(1, len(ids)))
+    return out or None
+
+
+def child_gain_ses(node, tree) -> list[float] | None:
+    ps = example_scores(tree, node, metric="f1")
+    return [f1_se(c) for c in tree.child_nodes(node)
+            if c.evaluation is not None and all(i in ps for i in c.evaluation.dataset_ids)] or None
+
+
+def full_child_values(node, tree) -> list[float] | None:
+    """Every full-train child F1 as a separate observation at the parent's input (None until it has one)."""
+    vals = [f1_of(c) for c in tree.child_nodes(node) if is_full(c, tree)]
+    return vals or None
+
+
+def full_child_ses(node, tree) -> list[float] | None:
+    return [f1_se(c) for c in tree.child_nodes(node) if is_full(c, tree)] or None
 
 
 def best_full_child_se(node, tree) -> float | None:
@@ -114,7 +162,7 @@ def template_of(node, module: str | None) -> str:
 def make_bo(args, embedder, value, noise):
     multi = len(modules_of(args)) > 1
     return BOSelector(embedder, AdditiveGPR() if multi else GPR(), EI(), value=value, noise=None if args.no_noise else noise,
-                      transform=None if args.bo_transform == "none" else args.bo_transform)
+                      transform=None if args.bo_transform == "none" else args.bo_transform, pca=args.pca or None)
 
 
 def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_state: dict, bos: dict):
@@ -149,11 +197,34 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
             fb, ok = FEEDBACK, PASSED
         else:
             fb, ok = (program_feedback, program_passed) if args.program else (feedback, passed)
-        mutator = ReflectiveExpander(fb, minibatch=args.minibatch, n=1 if arm == "gepa" else 3, seed=seed + r, passed=ok,
+        mutator = ReflectiveExpander(fb, minibatch=args.minibatch, n=1 if arm in ("gepa", "gepaei") else 3, seed=seed + r, passed=ok,
                                      module=module)
 
         if arm == "gepa":
             parent, to_minibatch = sampler, select.where(is_new)
+        elif arm == "gepaei":
+            if "parent" not in bos:
+                bos["parent"] = make_bo(args, embedder, child_gains, child_gain_ses)
+            parent_bo = bos["parent"]
+            to_minibatch = select.where(is_new)
+
+            async def parent(tree):
+                cands = candidates(tree, ids)
+                trained = [n for n in cands if parent_bo.value(n, tree) is not None]
+                # the pool grows one gate-passer at a time, so warm up until every current candidate (up to `warmup`
+                # of them) has been expanded at least once; a newcomer is then scored from the kernel (high variance)
+                fit = {"round": r, "n_cands": len(cands), "n_train": len(trained), "warmup": len(trained) < min(args.warmup, len(cands))}
+                if fit["warmup"]:
+                    p = sampler(tree)[0]
+                else:
+                    ranked = await parent_bo.rank(tree, cands)
+                    p = ranked[0][1]
+                    mu, var, ei = parent_bo.last_fit["pred"][p.id]
+                    fit.update({k: v for k, v in parent_bo.last_fit.items() if k != "pred"},
+                               mu=float(mu), var=float(var), ei=float(ei), ei_spread=float(ranked[0][0] - ranked[-1][0]))
+                fit.update(parent=p.id, parent_depth=p.depth, parent_f1=f1_of(p), parent_children=len(tree.child_nodes(p)))
+                tree.meta.setdefault("bo_fits", []).append(fit)
+                return [p]
         elif arm == "gepa3":
             parent = sampler
 
@@ -166,6 +237,37 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
                     if n is not keep:
                         screened.add(n.id); n.origin.params["screened_out"] = True
                 return [keep]
+        elif arm == "botree":
+            if "parent" not in bos:
+                bos["parent"] = (make_bo(args, embedder, full_child_values, full_child_ses) if args.botree_target == "children"
+                                 else make_bo(args, embedder, best_full_child_value, best_full_child_se))
+            parent_bo = bos["parent"]
+
+            async def parent(tree):
+                cands = candidates(tree, ids)
+                trained = [n for n in cands if parent_bo.value(n, tree) is not None]
+                fit = {"round": r, "n_cands": len(cands), "n_train": len(trained), "warmup": len(trained) < args.warmup}
+                if fit["warmup"]:
+                    p = sampler(tree)[0]
+                else:
+                    ranked = await parent_bo.rank(tree, cands)
+                    p = ranked[0][1]
+                    mu, var, ei = parent_bo.last_fit["pred"][p.id]
+                    fit.update({k: v for k, v in parent_bo.last_fit.items() if k != "pred"},
+                               mu=float(mu), var=float(var), ei=float(ei),
+                               ei_spread=float(ranked[0][0] - ranked[-1][0]),
+                               ei_leaf_share=sum(n.state != "expanded" for _, n in ranked[:3]) / 3)
+                fit.update(parent=p.id, parent_depth=p.depth, parent_f1=f1_of(p), parent_children=len(tree.child_nodes(p)))
+                tree.meta.setdefault("bo_fits", []).append(fit)
+                return [p]
+
+            async def to_full(tree):
+                fresh = select.where(is_new)(tree)
+                for n in fresh:
+                    tag(n)
+                    n.origin.params["accepted"] = None  # decided after the evaluation, by `record`
+                bos["last_fresh"] = [n.id for n in fresh]
+                return fresh
         else:
             async def parent(tree):
                 trained = ([n for n in candidates(tree, ids) if n.state == "expanded"] if pure
@@ -198,6 +300,11 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
                 tag(n)
             return ok
 
+        if arm == "botree":
+            return [
+                step(mutator, parent, name=f"r{r}/reflect"),
+                step(evaluate(dataset=full), to_full, name=f"r{r}/full"),
+            ]
         if pure:
             # one full evaluation per round: the surrogate's pick among the fresh children, nothing else
             async def to_full(tree):
@@ -298,6 +405,16 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
             if n.origin.params.get("accepted") is None and "accepted" in n.origin.params and n.evaluation is not None:
                 n.origin.params["accepted"] = beats_parent(tree, n)
         bc = best_candidate(tree, ids)
+        if arm == "botree" and st.name.endswith("/full") and bos.get("last_fresh"):
+            kids = [tree.nodes[i] for i in bos["last_fresh"]]
+            fit = tree.meta["bo_fits"][-1]
+            fit["children_f1"] = [f1_of(k) for k in kids]
+            fit["best_f1_so_far"] = f1_of(bc)
+            fit["calls"] = client.usage.calls
+            kf = " ".join(f"{f1_of(k):.3f}" for k in kids)
+            print(f"  {arm} s{seed} r{r} calls={client.usage.calls} parent={fit['parent']}@d{fit['parent_depth']} "
+                  f"f1={fit['parent_f1']:.3f}{' warmup' if fit['warmup'] else f' ei={fit['ei']:.4f}'} "
+                  f"kids=[{kf}] best={f1_of(bc):.3f} cands={len(candidates(tree, ids))}", flush=True)
         curve.append({"calls": client.usage.calls, "round": r, "step": st.name.split("/")[-1],
                       "best_f1": f1_of(bc) if bc else None, "best_em": bc.evaluation.metrics.get("em") if bc else None,
                       "best_sel_recall": bc.evaluation.metrics.get("sel_recall") if bc else None,
@@ -439,6 +556,8 @@ if __name__ == "__main__":
     ap.add_argument("--no-noise", action="store_true", help="bo: do not pass per-node F1 SE to the surrogate")
     ap.add_argument("--bo-gate", choices=["none", "minibatch"], default="none", help="bo: none = surrogate pick gets the full set directly (GP trains on full evals only); minibatch = old two-filter schedule")
     ap.add_argument("--bo-transform", choices=["pit", "none"], default="pit", help="bo: target transform for the surrogate")
+    ap.add_argument("--botree-target", choices=["children", "best"], default="children", help="botree: GP target per parent = each child's F1 (repeated observations) or the best child's")
+    ap.add_argument("--pca", type=int, default=0, help="bo/botree: project embeddings to k principal directions (refit per round on fit+candidate rows); 0 = raw 256-d")
     ap.add_argument("--parent-rank", choices=["full", "module"], default="full", help="bo, multi-module: EI on the full posterior or on the round's module component")
     ap.add_argument("--mock", action="store_true")
     ap.add_argument("--out", default="runs/hotpot")

@@ -53,6 +53,7 @@ from bpto import (Budget, BudgetExceeded, Dataset, LinearObjective, MockClient, 
 from bpto.bo import EI, GPR, UCB, AdditiveGPR, BOSelector, HashEmbedder, Thompson
 from bpto.gepa import ReflectiveExpander, candidates, pareto_pool, pareto_sample
 from bpto.gepa.loop import _accepted, minibatch_for
+from bpto.gepa.select import example_scores
 from bpto.ops import Variants
 from bpto.search import step
 from bpto.value import best_child, own_score
@@ -194,10 +195,18 @@ def best_child_se(n, tree):
 def parent_selector(arm: str, seed: int, r: int, ids: set[str], bo: BOSelector | None, warmup: int, module: str | None = None):
     mode = {"gepa-weighted": "weighted", "gepa-uniform": "uniform", "gepa-best": "best", "gepa-all": "all"}.get(arm, "weighted")
     base = pareto_sample(1, mode=mode, seed=seed * 7919 + r, ids=ids)
-    if not arm.startswith("bo"):
+    if not (arm.startswith("bo") or arm == "gepaei"):
         return base
 
     async def _sel(tree):
+        if arm == "gepaei":
+            # the pool grows one gate-passer at a time: warm up until every current candidate (up to `warmup`) has been tried
+            cands = candidates(tree, ids)
+            trained = [n for n in cands if bo.value(n, tree) is not None]
+            if len(trained) < min(warmup, len(cands)):
+                return base(tree)
+            ranked = await bo.rank(tree, cands)
+            return [n for _, n in ranked[:1]]
         expanded = [n for n in tree if n.state == "expanded" and best_child(n, tree) is not None]
         if len(expanded) < warmup:
             return base(tree)
@@ -206,6 +215,29 @@ def parent_selector(arm: str, seed: int, r: int, ids: set[str], bo: BOSelector |
         ranked = await bo.rank(tree, among, module=module if arm.endswith("-comp") else None)
         return [n for _, n in ranked[:1]]
     return _sel
+
+
+def child_est(n, tree):
+    """gepaei (v2, 2026-09-17): every evaluated child's estimated full score at the parent's input =
+    parent full score + (child − parent on the child's own rows). One observation per proposal, gate pass or fail."""
+    if not _is_full(n, tree):
+        return None
+    ps = example_scores(tree, n)
+    out = []
+    for c in tree.child_nodes(n):
+        if c.evaluation is None or not all(i in ps for i in c.evaluation.dataset_ids):
+            continue
+        ids = c.evaluation.dataset_ids
+        out.append(n.score + c.score - sum(ps[i] for i in ids) / max(1, len(ids)))
+    return out or None
+
+
+def child_est_se(n, tree):
+    if not _is_full(n, tree):
+        return None
+    ps = example_scores(tree, n)
+    return [se_of("acc")(c, tree) for c in tree.child_nodes(n)
+            if c.evaluation is not None and all(i in ps for i in c.evaluation.dataset_ids)] or None
 
 
 def _is_full(n, tree):
@@ -275,7 +307,11 @@ def make_schedule(arm: str, seed: int, minibatch: int, warmup: int, modules: int
         parent_bo = BOSelector(HashEmbedder(dim=128), surrogate(), EI(), value=best_child, noise=pn) if arm.startswith("bo") else None
         child_bo = BOSelector(HashEmbedder(dim=128), surrogate(), EI(), value=own_score, noise=cn) if screen else None
     else:
-        parent_bo = BOSelector(HashEmbedder(dim=128), GPR(), EI(), value=best_child) if arm.startswith("bo") else None
+        if arm == "gepaei":
+            parent_bo = BOSelector(HashEmbedder(dim=128), GPR(), EI(), value=child_est, noise=child_est_se if use_noise else None,
+                                   transform="pit", pca=4)
+        else:
+            parent_bo = BOSelector(HashEmbedder(dim=128), GPR(), EI(), value=best_child) if arm.startswith("bo") else None
         child_bo = BOSelector(HashEmbedder(dim=128), GPR(), EI(), value=own_score) if screen else None
 
     def schedule(tree, r):
@@ -341,7 +377,7 @@ def best_at(curve, calls: int) -> float:
     return v
 
 
-ARMS = ["gepa-weighted", "gepa-uniform", "gepa-best", "gepa-all", "bo-replace", "bo-in-pareto", "gepa+screen", "bo+screen", "bo-pure"]
+ARMS = ["gepa-weighted", "gepa-uniform", "gepa-best", "gepa-all", "bo-replace", "bo-in-pareto", "gepa+screen", "bo+screen", "bo-pure", "gepaei"]
 ARMS2 = ["gepa-rr", "bo-concat+screen", "bo-additive+screen", "bo-additive-comp+screen"]
 
 

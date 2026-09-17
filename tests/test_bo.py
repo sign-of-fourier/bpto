@@ -8,7 +8,7 @@ import numpy as np
 from bpto import Dataset, LinearObjective, MockClient, Prompt, Task, Tree
 from bpto.bo import EI, GPR, UCB, BOSelector, HashEmbedder, HTTPEmbedder, Thompson, config_features
 from bpto.tree import Evaluation, NodeState, Origin
-from bpto.value import own_score
+from bpto.value import child_scores, own_score
 
 
 def test_gpr_recovers_smooth_function():
@@ -125,3 +125,33 @@ async def test_config_features_are_appended():
     bo = BOSelector(NumEmbedder(), value=own_score, features=config_features)
     await bo._ensure_embeddings([a])
     assert bo._x(a) == [0.2, 0.5, 0.1]
+
+
+class PaddedEmbedder:
+    """The 1-d signal buried in 8 noisy dimensions: PCA must recover contrast for the single lengthscale."""
+
+    async def embed(self, texts):
+        out = []
+        for t in texts:
+            x = float(t.split()[0])
+            r = random.Random(hash(t) % 10_000)
+            out.append([x] + [0.01 * r.random() for _ in range(8)])
+        return out
+
+
+async def test_bo_selector_list_targets_and_pca():
+    tree = Tree(_task())
+    parents = [tree.add_child(tree.root, f"{x:.4f} {{x}}", Origin(op="random")) for x in (0.1, 0.3, 0.5, 0.7, 0.9)]
+    for p in parents:
+        _fake_eval(p)
+        for d in (-0.02, 0.0, 0.02):  # three children per parent: repeated observations at one input
+            c = tree.add_child(p, f"{float(p.prompt.template.split()[0]) + d:.4f} {{x}}", Origin(op="random"))
+            _fake_eval(c)
+
+    kids = child_scores  # DescendantValue(1, list): every child score is an observation at the parent's input
+    bo = BOSelector(PaddedEmbedder(), GPR(), EI(xi=0.0), value=kids, pca=2)
+    ranked = await bo.rank(tree, parents)
+    assert bo.last_fit["n_train"] == 20 and bo.last_fit["n_inputs"] == 6  # root has 5 evaluated children too
+    assert bo.last_fit["pca"]["dims"] == 2 and bo.last_fit["pca"]["explained"] > 0.9
+    # the parent whose children peak (f peaks near x=0.5) ranks first, or the flat-acquisition warning would have fired
+    assert ranked[0][1] is max(parents, key=lambda p: sum(kids(p, tree)))
