@@ -68,6 +68,17 @@ class GPR:
         var = np.maximum(1.0 - np.sum(v * v, 0), 1e-12)
         return list(mu * self._y_sd + self._y_mu), list(var * self._y_sd ** 2)
 
+    def predict_cov(self, X) -> tuple[list[float], np.ndarray]:
+        """(mean, full posterior covariance) over the rows of X, in y units: the joint needed by a batch
+        acquisition. Same solve as `predict`; the cross term is K_ss - vᵀv instead of its diagonal."""
+        X = np.asarray(X, float)
+        Ks = self._k(X, self._X, self.ell_)
+        mu = Ks @ self._alpha
+        v = np.linalg.solve(self._L, Ks.T)
+        cov = self._k(X, X, self.ell_) - v.T @ v
+        cov = _psd(cov)
+        return list(mu * self._y_sd + self._y_mu), cov * self._y_sd ** 2
+
 
 class AdditiveGPR:
     """GP with an additive kernel over blocks of the feature vector: k(x, x') = Σ_m RBF_m(x[b_m], x'[b_m]).
@@ -155,6 +166,19 @@ class AdditiveGPR:
         shift = self._y_mu if block is None else 0.0
         return list(mu * self._y_sd + shift), list(var * self._y_sd ** 2)
 
+    def predict_cov(self, X, block: int | None = None) -> tuple[list[float], np.ndarray]:
+        """(mean, full posterior covariance) of f, or of the block-m component alone; see `GPR.predict_cov`."""
+        X = np.asarray(X, float)
+        if block is None:
+            Ks, Kss = self._k(X, self._X, self.mult_), self._k(X, X, self.mult_)
+        else:
+            Ks, Kss = self._kb(X, self._X, block, self.mult_), self._kb(X, X, block, self.mult_)
+        mu = Ks @ self._alpha
+        v = np.linalg.solve(self._L, Ks.T)
+        cov = _psd(Kss - v.T @ v)
+        shift = self._y_mu if block is None else 0.0
+        return list(mu * self._y_sd + shift), cov * self._y_sd ** 2
+
 
 class PIT:
     """Probability-integral transform of the targets: y -> rank-based ECDF -> standard-normal quantile.
@@ -200,6 +224,17 @@ class PIT:
         local = (hi - lo) / (2 * h)
         global_ = float(self.z_[-1] - self.z_[0]) / span
         return [float(max(s, global_)) for s in local]
+
+
+def _psd(cov: np.ndarray, floor: float = 1e-12) -> np.ndarray:
+    """Symmetrise and floor the diagonal so round-off in K_ss - vᵀv cannot leave a batch acquisition a
+    non-PSD matrix (a candidate at a training input has posterior variance ~0, and the subtraction can go
+    slightly negative)."""
+    cov = 0.5 * (cov + cov.T)
+    d = np.diag(cov)
+    if np.any(d < floor):
+        cov = cov + np.diag(np.maximum(floor - d, 0.0))
+    return cov
 
 
 def _ndtri(p: np.ndarray) -> np.ndarray:

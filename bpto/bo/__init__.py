@@ -13,7 +13,7 @@ from ..select import Selector, unexpanded
 from ..prompt import Program
 from ..tree import Node, Tree
 from ..value import Value, best_grandchild
-from .acquisition import EI, UCB, Mean, Thompson
+from .acquisition import EI, QEI, UCB, KrigingBeliever, Mean, QuantecarloQEI, Thompson
 from .embedders import AzureOpenAIEmbedder, BedrockEmbedder, HashEmbedder, HTTPEmbedder, OpenAIEmbedder, VoyageEmbedder
 import logging
 
@@ -21,7 +21,8 @@ from .gpr import GPR, PIT, AdditiveGPR
 
 log = logging.getLogger("bpto")
 
-__all__ = ["BOSelector", "Embedder", "Surrogate", "Acquisition", "EI", "UCB", "Thompson", "Mean", "GPR", "AdditiveGPR", "PIT",
+__all__ = ["BOSelector", "Embedder", "Surrogate", "Acquisition", "BatchAcquisition", "EI", "UCB", "Thompson", "Mean",
+           "KrigingBeliever", "QEI", "QuantecarloQEI", "GPR", "AdditiveGPR", "PIT",
            "AzureOpenAIEmbedder", "BedrockEmbedder", "HashEmbedder", "HTTPEmbedder", "OpenAIEmbedder", "VoyageEmbedder", "config_features"]
 
 
@@ -40,6 +41,12 @@ class Acquisition(Protocol):
     def __call__(self, mean: list[float], var: list[float], best_y: float) -> list[float]: ...
 
 
+class BatchAcquisition(Protocol):
+    def __call__(self, mean: list[float], cov, best_y: float, q: int) -> list[int]:
+        """Indices of q candidates chosen jointly from the full posterior (cov is (n, n))."""
+        ...
+
+
 def config_features(node: Node) -> list[float]:
     """Numeric features of a node's ModelConfig, for when the config is part of the search space."""
     c = node.config
@@ -52,10 +59,14 @@ class BOSelector:
     def __init__(self, embedder: Embedder, surrogate: Surrogate | None = None, acquisition: Acquisition | None = None,
                  value: Value = best_grandchild, features: Callable[[Node], list[float]] | None = None,
                  noise: Callable[[Node, Tree], float | None] | None = None, transform: str | None = None,
-                 pca: int | None = None):
+                 pca: int | None = None, batch: BatchAcquisition | None = None):
         self.embedder = embedder
         self.surrogate = surrogate or GPR()
         self.acquisition = acquisition or EI()
+        # batch: how `top(k)` picks k > 1. None = top-k by the per-candidate acquisition (k independent bets, which
+        # for sibling candidates is one bet k times). A BatchAcquisition gets the joint posterior over the
+        # candidates after the same fit and chooses the k jointly. k == 1 never uses it.
+        self.batch = batch
         self.value, self.features, self.noise = value, features, noise
         self.transform = transform  # "pit": rank-based probability-integral transform of the targets (see gpr.PIT)
         # pca=k: project inputs to their top-k principal directions, fit each call on the pooled rows (training inputs
@@ -64,6 +75,7 @@ class BOSelector:
         self.pca = pca
         self.last_fit: dict = {}
         self._same_top = (None, 0)
+        self._last_rank = None  # (Xc, candidates, best_y, module) of the last fitted rank, for top(k)'s batch step
 
     async def _ensure_embeddings(self, nodes: list[Node]) -> None:
         """Plain nodes get one vector; Program nodes one per module (each text embedded once, keyed by module)."""
@@ -130,6 +142,7 @@ class BOSelector:
             owners.append(n)
         await self._ensure_embeddings(owners + candidates)
         if not train or not candidates:
+            self._last_rank = None
             return [(0.0, n) for n in candidates]
         if getattr(self.surrogate, "blocks", 0) is None:
             self.surrogate.blocks = self._blocks(train[0][0])
@@ -165,6 +178,7 @@ class BOSelector:
             best_y = max(self.surrogate.predict(X, block=b)[0])
         acq = self.acquisition(mean, var, best_y)
         ranked = sorted(zip(acq, candidates), key=lambda t: t[0], reverse=True)
+        self._last_rank = (Xc, candidates, float(best_y), module)
         self.last_fit = {"n_train": len(train), "n_inputs": len(owners), "best_y": float(best_y), "pca": getattr(self, "last_pca", None), "best_obs": float(max(y)), "module": module,
                          "transform": self.transform, "flat": bool(max(acq) - min(acq) <= 0.0 or max(acq) < 1e-12),
                          **({"ell": getattr(self.surrogate, "ell_", None), "noise": getattr(self.surrogate, "noise_", None)}),
@@ -200,8 +214,21 @@ class BOSelector:
         return out
 
     def top(self, k: int, among: Selector = unexpanded):
-        """An async selector: `tree.apply` awaits it. Fits, ranks `among(tree)`, returns the top k."""
+        """An async selector: `tree.apply` awaits it. Fits, ranks `among(tree)`, returns the top k.
+
+        With `batch` set and k > 1 the k are chosen jointly from the posterior covariance over the candidates
+        (see `BatchAcquisition`); `rank`, `last_fit` and every fit-time rule are unchanged, and `last_fit["batch"]`
+        records the chosen set and what the batch acquisition reported about it."""
         async def _sel(tree: Tree) -> list[Node]:
             ranked = await self.rank(tree, among(tree))
-            return [n for _, n in ranked[:k]]
+            if self.batch is None or k <= 1 or len(ranked) <= k or not self._last_rank:
+                return [n for _, n in ranked[:k]]
+            Xc, candidates, best_y, module = self._last_rank
+            mean, cov = (self.surrogate.predict_cov(Xc) if module is None
+                         else self.surrogate.predict_cov(Xc, block=self._modules(candidates[0]).index(module)))
+            idx = self.batch(mean, cov, best_y, k)
+            picks = [candidates[i] for i in idx]
+            self.last_fit["batch"] = {"method": type(self.batch).__name__, "ids": [n.id for n in picks],
+                                      "top_k_ids": [n.id for _, n in ranked[:k]], **getattr(self.batch, "last", {})}
+            return picks
         return _sel

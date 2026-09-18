@@ -155,3 +155,92 @@ async def test_bo_selector_list_targets_and_pca():
     assert bo.last_fit["pca"]["dims"] == 2 and bo.last_fit["pca"]["explained"] > 0.9
     # the parent whose children peak (f peaks near x=0.5) ranks first, or the flat-acquisition warning would have fired
     assert ranked[0][1] is max(parents, key=lambda p: sum(kids(p, tree)))
+
+
+# ---- batch acquisitions (q > 1) -------------------------------------------------------------------
+
+
+def _clustered_posterior():
+    """Three candidates: 0 and 1 are siblings (corr 0.99, same mean/var), 2 is independent with a slightly lower
+    mean. Any joint criterion pairs a sibling with 2; independent top-2 by EI takes both siblings."""
+    mean = [1.0, 1.0, 0.8]
+    cov = np.array([[1.0, 0.99, 0.0], [0.99, 1.0, 0.0], [0.0, 0.0, 1.0]])
+    return mean, cov
+
+
+def test_predict_cov_matches_predict_and_is_psd():
+    from bpto.bo import AdditiveGPR
+    rng = np.random.default_rng(0)
+    X = rng.uniform(-3, 3, (25, 2))
+    y = np.sin(X[:, 0]) + 0.3 * X[:, 1]
+    Xt = rng.uniform(-3, 3, (10, 2)).tolist()
+    for gp in (GPR().fit(X.tolist(), y.tolist()), AdditiveGPR([(0, 1), (1, 2)]).fit(X.tolist(), y.tolist())):
+        mu, var = gp.predict(Xt)
+        mu2, cov = gp.predict_cov(Xt)
+        assert cov.shape == (10, 10)
+        assert np.allclose(mu, mu2) and np.allclose(np.diag(cov), var, rtol=1e-6, atol=1e-9)
+        assert np.linalg.eigvalsh(cov).min() > -1e-9
+        # near-neighbours are positively correlated, far points are not
+        near, far = Xt[0], (np.asarray(Xt[0]) + [0.05, 0.0]).tolist()
+        _, c = gp.predict_cov([near, far, [3.0, -3.0]])
+        assert c[0, 1] / math.sqrt(c[0, 0] * c[1, 1]) > 0.9
+    gp = AdditiveGPR([(0, 1), (1, 2)]).fit(X.tolist(), y.tolist())
+    _, cov_b = gp.predict_cov(Xt, block=1)
+    assert np.allclose(np.diag(cov_b), gp.predict(Xt, block=1)[1], rtol=1e-6, atol=1e-9)
+
+
+def test_batch_acquisitions_avoid_siblings():
+    from bpto.bo import QEI, KrigingBeliever
+    mean, cov = _clustered_posterior()
+    top2 = sorted(range(3), key=lambda i: -EI(xi=0.0)(mean, list(np.diag(cov)), 0.5)[i])[:2]
+    assert sorted(top2) == [0, 1]                                   # the failure mode
+    for batch in (KrigingBeliever(), QEI(n_samples=2000, seed=0)):
+        picks = batch(mean, cov, 0.5, 2)
+        assert len(picks) == 2 and len(set(picks)) == 2
+        assert 2 in picks, (type(batch).__name__, picks)
+    q = QEI(n_samples=2000, seed=0)
+    assert sorted(q(mean, cov, 0.5, 5)) == [0, 1, 2] and q.last["qei"] > 0   # q > n: every candidate, once
+
+
+def test_quantecarlo_batch_uses_client_select():
+    from bpto.bo import QuantecarloQEI
+
+    class FakeClient:
+        def __init__(self):
+            self.calls = []
+
+        def select(self, mu, cov, best_y, q, **kw):
+            self.calls.append((np.asarray(mu), np.asarray(cov), best_y, q, kw))
+            return {"indices": [2, 0], "qei": 0.4, "regime": "exact", "n_cands": 3, "n_sampled": 3, "n_batches": 3}
+
+    mean, cov = _clustered_posterior()
+    fc = FakeClient()
+    b = QuantecarloQEI(fc, pi_floor=0.1)
+    assert b(mean, cov, 0.5, 2) == [2, 0]
+    (mu, c, by, q, kw), = fc.calls
+    assert np.allclose(mu, mean) and np.allclose(c, cov) and by == 0.5 and q == 2 and kw == {"pi_floor": 0.1}
+    assert b.last["regime"] == "exact" and b.last["qei"] == 0.4
+
+
+async def test_bo_selector_top_k_uses_batch_and_records_it():
+    from bpto.bo import QEI
+    tree = Tree(_task())
+    xs = [i / 40 for i in range(40)]
+    nodes = [tree.add_child(tree.root, f"{x:.4f} {{x}}", Origin(op="random")) for x in xs]
+    train, cands = nodes[::4], [n for i, n in enumerate(nodes) if i % 4]
+    for n in train:
+        _fake_eval(n)
+    plain = BOSelector(NumEmbedder(), GPR(), EI(xi=0.0), value=own_score)
+    joint = BOSelector(NumEmbedder(), GPR(), EI(xi=0.0), value=own_score, batch=QEI(n_samples=1000, seed=0))
+    p1 = await plain.top(k=1, among=lambda t: cands)(tree)
+    j1 = await joint.top(k=1, among=lambda t: cands)(tree)
+    assert p1 == j1 and "batch" not in joint.last_fit                         # k == 1: byte-identical path
+    p4 = await plain.top(k=4, among=lambda t: cands)(tree)
+    j4 = await joint.top(k=4, among=lambda t: cands)(tree)
+    assert len(j4) == 4 and len({n.id for n in j4}) == 4 and all(n in cands for n in j4)
+    rec = joint.last_fit["batch"]
+    assert rec["method"] == "QEI" and rec["ids"] == [n.id for n in j4] and rec["top_k_ids"] == [n.id for n in p4]
+    assert rec["qei"] >= 0.0
+    # the joint batch spreads over x where independent top-4 stacks neighbours around the EI peak
+    spread = lambda ns: max(float(n.prompt.template.split()[0]) for n in ns) - min(float(n.prompt.template.split()[0]) for n in ns)
+    assert spread(j4) >= spread(p4)
