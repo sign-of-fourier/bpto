@@ -38,7 +38,8 @@ Arms (same root, train split, reflector model, minibatch, gate and rollout budge
 Per (arm, seed): runs/<out>/<arm>-s<seed>/{tree.json,events.jsonl,trace.jsonl,cache.jsonl} + a row in results.jsonl
 (anytime curve of best train F1, held-out EM/F1 of root and best, proposal/gate counts).
 
-Programs: `--program --modules selector,answerer` makes every node a two-module Program. Mutation is GEPA's
+Programs: `--program` makes every node a two-module graph Program run by bpto's executor; `--modules selector,answerer`
+puts both under search (default: the selector only, answerer fixed). Mutation is GEPA's
 round-robin (module r mod M, one module rewritten per child, both arms). The bo arm then uses `AdditiveGPR` (one RBF
 per module, summed) with per-node noise (F1 SE), ranks parents on the round's module component, and at the end
 evaluates the additive model's "recombination" (per-module argmax of posterior mean) on train and held-out.

@@ -4,7 +4,9 @@ Optimize a prompt by growing a tree of rewrites, scoring nodes on a training set
 choosing where to expand next — first by hand, later with Bayesian optimization over
 prompt embeddings.
 
-- A **node** is a prompt (plus an optional per-node model config).
+- A **node** is a prompt (plus an optional per-node model config), or a **Program**: several module prompts,
+  optionally wired with edges into a graph (extract -> shorten -> orchestrate -> back to extract, ...) that
+  `evaluate` runs end to end; an orchestrating module returns `next` to choose its edge.
 - **Ops** act on sets of nodes: `random(n)` and `guided(directive, n)` propose children,
   `evaluate()` runs the training set. You compose them: `[random, guided, random, evaluate]`.
 - **Selectors** pick the nodes an op applies to: `leaves`, `unevaluated`, `top_k`, `pareto`, …
@@ -163,6 +165,7 @@ bpto/
   scoring.py  Scorer / Objective protocols; exact_match, token_count, llm_judge, Linear/ConstrainedObjective, pareto_front
   tree.py     Node lifecycle PROPOSED → EVALUATED → EXPANDED; ancestors / descendants(generations=k); save/load
   ops.py      random, guided, evaluate (chunked), Pipeline
+  executor.py runs a graph Program (modules + edges, `next`-routed orchestration, step cap) for one example; writes the trace
   search.py   run(tree, schedule, Stop, checkpoint), successive_halving
   observe.py  EventLog (JSONL), Progress (stderr), tree_text / tree_dot / plot_tree / lineage
   select.py   leaves, unevaluated, unexpanded, depth, top_k, pareto, union

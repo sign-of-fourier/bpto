@@ -14,6 +14,7 @@ from typing import Any
 from pydantic import BaseModel, Field
 
 from .data import Dataset, Example
+from .executor import run_program
 from .llm import BudgetExceeded, Completion, ModelConfig
 from .metrics import mean_metrics, std_metrics
 from .prompt import Program, Prompt
@@ -255,13 +256,23 @@ class evaluate(Op):
         return ds.sample(self.sample, self.seed) if self.sample else ds
 
     async def _one_example(self, tree: Tree, node: Node, ex: Example) -> ExampleResult:
+        """A graph Program is run by the executor (every module, trace and executor metrics filled in); a plain
+        Prompt or an edge-less Program sends the entry module only and the scorer runs the rest."""
         task = tree.task
-        rendered = node.prompt.render(**ex.inputs)
-        cfg = (task.config or task.client.default_config).merged(node.config)
+        prompt = node.prompt
+        graph = isinstance(prompt, Program) and prompt.is_graph
+        entry = prompt.entry if isinstance(prompt, Program) else None
         try:
-            comp = await task.client.complete(rendered, config=cfg, schema=task.schema)
-            ctx = ScoreContext(task, task.client, rendered)
-            metrics = await run_scorer(task.scorer, node.prompt, ex, comp, ctx)
+            if graph:
+                run = await run_program(task, prompt, ex, node.config)
+                comp, rendered, base = run.completion, run.rendered, run.metrics
+                ctx = ScoreContext(task, task.client, rendered, trace=dict(run.trace))
+            else:
+                rendered = prompt.render(**ex.inputs)
+                cfg = (task.config_for(entry) or task.client.default_config).merged(node.config)
+                comp = await task.client.complete(rendered, config=cfg, schema=task.schema_for(entry))
+                ctx, base = ScoreContext(task, task.client, rendered), {}
+            metrics = {**base, **await run_scorer(task.scorer, prompt, ex, comp, ctx)}
             parsed = comp.parsed.model_dump() if isinstance(comp.parsed, BaseModel) else comp.parsed
             return ExampleResult(example_id=ex.id, output=comp.text, parsed=parsed, metrics=metrics, trace=ctx.trace or None)
         except BudgetExceeded:

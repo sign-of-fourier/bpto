@@ -35,7 +35,29 @@ class ExampleResult(BaseModel):
     parsed: Any = None
     metrics: Metrics
     error: str | None = None
-    trace: dict[str, Any] | None = None  # non-entry module inputs/outputs, filled by the scorer (programs)
+    # per-module inputs/outputs of a Program. Executor-run graphs: module -> [{input, output, parsed, step_idx}, ...]
+    # (one entry per visit); scorer-run programs may store one {input, output, ...} dict. Read with `trace_of`.
+    trace: dict[str, Any] | None = None
+
+
+def _trace(result_or_trace) -> dict[str, Any]:
+    return (result_or_trace if isinstance(result_or_trace, dict) else result_or_trace.trace) or {}
+
+
+def trace_of(result_or_trace: "ExampleResult | dict[str, Any] | None", module: str, visit: int = -1) -> dict[str, Any] | None:
+    """The `visit`-th (default last) trace entry of `module`, whichever shape the trace was stored in. Takes an
+    `ExampleResult` or a trace dict (`ScoreContext.trace` inside a scorer)."""
+    tr = _trace(result_or_trace).get(module)
+    if tr is None:
+        return None
+    if isinstance(tr, list):
+        return tr[visit] if tr and -len(tr) <= visit < len(tr) else None
+    return tr
+
+
+def trace_visits(result_or_trace: "ExampleResult | dict[str, Any] | None", module: str) -> list[dict[str, Any]]:
+    tr = _trace(result_or_trace).get(module)
+    return [] if tr is None else (list(tr) if isinstance(tr, list) else [tr])
 
 
 class Evaluation(BaseModel):

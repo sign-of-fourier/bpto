@@ -3,7 +3,7 @@ paragraphs (titles) the answer had to be assembled from - the "supporting facts"
 from __future__ import annotations
 
 from bpto import Example
-from bpto.tree import ExampleResult
+from bpto.tree import ExampleResult, trace_of
 
 from . import em_f1
 
@@ -36,7 +36,9 @@ def feedback(example: Example, result: ExampleResult) -> str:
 
 def _selected(example: Example, result: ExampleResult) -> list[str]:
     from .program import select_titles
-    return select_titles(result.parsed, example.inputs["context"])
+    sel = trace_of(result, "selector")
+    parsed = (sel.get("parsed") if sel else None) or result.parsed  # executor trace; else a selector-only result
+    return select_titles(parsed, example.inputs["context"])
 
 
 def program_passed(example: Example, result: ExampleResult) -> bool:
@@ -75,8 +77,8 @@ def answerer_passed(example: Example, result: ExampleResult) -> bool:
 def answerer_feedback(example: Example, result: ExampleResult) -> str:
     if result.error:
         return f"The response failed with an error: {result.error}"
-    tr = (result.trace or {}).get("answerer") or {}
-    pred = tr.get("answer", "")
+    tr = trace_of(result, "answerer") or {}
+    pred = (tr.get("parsed") or {}).get("answer") or tr.get("answer", "")
     em, f1 = em_f1(str(pred), example.answer or "")
     parts = [f"expected answer: {example.answer!r}; model answered: {pred!r}; F1 {f1:.2f}" + (" (exact match)" if em else "")]
     if result.metrics.get("sel_recall", 1.0) < 1.0:
