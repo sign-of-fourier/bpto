@@ -10,11 +10,15 @@ interrupted arm-seed pays only for what it had not already done.
 
 Arms (same root, train split, reflector model, minibatch, gate and rollout budget):
     gepa   Pareto pool on per-example F1, sample ∝ wins, 1 reflected child/round, minibatch gate (child > parent).
-    gepaei selection-only test (user, 2026-09-17): gepa's expansion verbatim (1 child, minibatch gate, full eval on pass)
+           `--q 2`: two Pareto draws (without replacement) per round once the pool has 2 members - the parallel-GEPA
+           control for gepa-ei's q > 1 (does a joint acquisition pick a more useful pair than two samples?).
+    gepa-ei (was `gepaei`) selection-only test (user, 2026-09-17): gepa's expansion verbatim (1 child, minibatch gate, full eval on pass)
            but the node to expand is chosen by EI (GEPA sampler for `warmup` rounds). The GP trains on EVERY proposal:
            one observation per child at the parent's input = the child's paired gain over the parent on the child's
            own rows (5-row for gate failures, full train for passers), per-observation F1 SE. Supersedes the
-           2026-09-16 "never train on minibatch scores" rule for this arm.
+           2026-09-16 "never train on minibatch scores" rule for this arm. `--q 2 --batch quantecarlo`: once past
+           warmup, q parents per round chosen jointly by a batch acquisition (speed test, 2026-09-18: same rollouts
+           in fewer rounds; q chains of reflect/minibatch/full overlap within the round). Warmup stays q = 1.
     gepa3  control: as gepa but 3 children/round, keep 1 at random - isolates "more proposals" from "surrogate picks".
     bo     no minibatch. EI over the candidates with value = the candidate's own full-train F1 (GEPA sampler until
            `warmup` candidates have been expanded), 3 reflected children, surrogate keeps 1 and it gets the full train set.
@@ -52,7 +56,7 @@ import time
 from pathlib import Path
 
 from bpto import Budget, CompletionCache, Dataset, EventLog, ModelConfig, Origin, Stop, Tree, evaluate, run, select
-from bpto.bo import EI, GPR, AdditiveGPR, BOSelector, HashEmbedder
+from bpto.bo import EI, GPR, AdditiveGPR, BOSelector, HashEmbedder, KrigingBeliever, QEI, QuantecarloQEI
 from bpto.gepa import ReflectiveExpander, beats_parent, candidates, pareto_sample
 from bpto.gepa.select import example_scores
 from bpto.gepa.loop import minibatch_for
@@ -64,7 +68,7 @@ from tasks.hotpotqa.program import make_program_task
 
 from .compare import load_env
 
-ARMS = ["gepa", "bo", "mipro"]  # also: gepa3, gepaei, botree
+ARMS = ["gepa", "bo", "mipro"]  # also: gepa3, gepa-ei, botree
 
 
 def f1_of(n) -> float | None:
@@ -97,7 +101,7 @@ def best_full_child_value(node, tree) -> float | None:
 
 
 def child_gains(node, tree) -> list[float] | None:
-    """gepaei target: every evaluated child's ESTIMATED full-train F1, one observation per proposal at the parent's input:
+    """gepa-ei target: every evaluated child's ESTIMATED full-train F1, one observation per proposal at the parent's input:
     parent's full-train F1 + (child − parent on the child's own rows). The paired difference cancels row difficulty (a
     gate failure was only ever scored on its 5 minibatch rows); adding the parent's full F1 makes it absolute. v1
     (2026-09-17, 6 seeds, −.017 vs gepa) used the bare gain, which rewards weak parents - EI expanded the pool's
@@ -159,10 +163,22 @@ def template_of(node, module: str | None) -> str:
     return node.prompt.modules[module].template if module else node.prompt.template
 
 
-def make_bo(args, embedder, value, noise):
+def make_batch(args, seed):
+    """The batch acquisition for q > 1 (None = independent top-q by EI). Seeded where the method is stochastic."""
+    if args.q <= 1 or args.batch == "topk":
+        return None
+    if args.batch == "kb":
+        return KrigingBeliever()
+    if args.batch == "qei":
+        return QEI(seed=seed)
+    return QuantecarloQEI(seed=seed)
+
+
+def make_bo(args, embedder, value, noise, seed=0):
     multi = len(modules_of(args)) > 1
     return BOSelector(embedder, AdditiveGPR() if multi else GPR(), EI(), value=value, noise=None if args.no_noise else noise,
-                      transform=None if args.bo_transform == "none" else args.bo_transform, pca=args.pca or None)
+                      transform=None if args.bo_transform == "none" else args.bo_transform, pca=args.pca or None,
+                      batch=make_batch(args, seed))
 
 
 def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_state: dict, bos: dict):
@@ -197,14 +213,25 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
             fb, ok = FEEDBACK, PASSED
         else:
             fb, ok = (program_feedback, program_passed) if args.program else (feedback, passed)
-        mutator = ReflectiveExpander(fb, minibatch=args.minibatch, n=1 if arm in ("gepa", "gepaei") else 3, seed=seed + r, passed=ok,
+        mutator = ReflectiveExpander(fb, minibatch=args.minibatch, n=1 if arm in ("gepa", "gepa-ei") else 3, seed=seed + r, passed=ok,
                                      module=module)
 
         if arm == "gepa":
-            parent, to_minibatch = sampler, select.where(is_new)
-        elif arm == "gepaei":
+            to_minibatch = select.where(is_new)
+
+            def parent(tree):
+                # same switch point as gepa-ei: q parents once there is a pool to draw from, 1 while it is the root alone
+                cands = candidates(tree, ids)
+                q = min(args.q, len(cands)) if len(cands) > 1 else 1
+                picks = pareto_sample(q, mode="weighted", seed=seed * 7919 + r, ids=ids, metric="f1")(tree)
+                tree.meta.setdefault("bo_fits", []).append(
+                    {"round": r, "n_cands": len(cands), "q": q, "parents": [n.id for n in picks], "parent": picks[0].id,
+                     "parent_f1": f1_of(picks[0]), "parent_depth": picks[0].depth, "warmup": False,
+                     "picks": [{"id": n.id, "f1": f1_of(n), "sibling_of_pick": any(o is not n and o.parent_id == n.parent_id for o in picks)} for n in picks]})
+                return picks
+        elif arm == "gepa-ei":
             if "parent" not in bos:
-                bos["parent"] = make_bo(args, embedder, child_gains, child_gain_ses)
+                bos["parent"] = make_bo(args, embedder, child_gains, child_gain_ses, seed=seed)
             parent_bo = bos["parent"]
             to_minibatch = select.where(is_new)
 
@@ -214,17 +241,28 @@ def schedule_for(arm, seed, args, embedder, client, screened: set[str], mipro_st
                 # the pool grows one gate-passer at a time, so warm up until every current candidate (up to `warmup`
                 # of them) has been expanded at least once; a newcomer is then scored from the kernel (high variance)
                 fit = {"round": r, "n_cands": len(cands), "n_train": len(trained), "warmup": len(trained) < min(args.warmup, len(cands))}
-                if fit["warmup"]:
-                    p = sampler(tree)[0]
+                # q > 1 once there is a pool to choose from (same switch as the gepa arm); 1 while it is the root alone
+                q = min(args.q, len(cands)) if len(cands) > 1 else 1
+                if fit["warmup"]:  # an unexpanded newcomer: GEPA's sampler, still q draws so the arms stay paired
+                    picks = pareto_sample(q, mode="weighted", seed=seed * 7919 + r, ids=ids, metric="f1")(tree)
+                    fit["q"] = q
                 else:
-                    ranked = await parent_bo.rank(tree, cands)
-                    p = ranked[0][1]
-                    mu, var, ei = parent_bo.last_fit["pred"][p.id]
+                    picks = await parent_bo.top(q, among=lambda t: cands)(tree)
+                    pred = parent_bo.last_fit["pred"]
+                    eis = [pred[n.id][2] for n in cands]
                     fit.update({k: v for k, v in parent_bo.last_fit.items() if k != "pred"},
-                               mu=float(mu), var=float(var), ei=float(ei), ei_spread=float(ranked[0][0] - ranked[-1][0]))
-                fit.update(parent=p.id, parent_depth=p.depth, parent_f1=f1_of(p), parent_children=len(tree.child_nodes(p)))
+                               q=q, ei_spread=float(max(eis) - min(eis)),
+                               picks=[{"id": p.id, "mu": float(pred[p.id][0]), "var": float(pred[p.id][1]), "ei": float(pred[p.id][2]),
+                                       "rank": sorted(cands, key=lambda n: -pred[n.id][2]).index(p),
+                                       "sibling_of_pick": any(o is not p and o.parent_id == p.parent_id for o in picks)} for p in picks])
+                    b = parent_bo.last_fit.get("batch")
+                    if b:
+                        fit["batch_differs"] = set(b["ids"]) != set(b["top_k_ids"])
+                p = picks[0]
+                fit.update(parent=p.id, parent_depth=p.depth, parent_f1=f1_of(p), parent_children=len(tree.child_nodes(p)),
+                           parents=[n.id for n in picks])
                 tree.meta.setdefault("bo_fits", []).append(fit)
-                return [p]
+                return picks
         elif arm == "gepa3":
             parent = sampler
 
@@ -452,7 +490,8 @@ async def run_one(arm, seed, args, full_data, global_budget, embedder):
         recomb = {"id": node.id, "existing": same is not None, "parts": {m: n.id for m, n in pick.items()},
                   "train": node.evaluation.metrics, "held": held_r.metrics, "prompt": str(node.prompt)}
     row = {"arm": arm, "seed": seed, "rollouts": search_calls, "held_calls": client.usage.calls - search_calls,
-           "stopped": res.stopped_because, "seconds": round(time.time() - t0, 1), "nodes": len(tree), "candidates": len(cands),
+           "stopped": res.stopped_because, "seconds": round(time.time() - t0, 1), "rounds": max((c["round"] for c in curve), default=0),
+           "q": args.q, "batch": args.batch if args.q > 1 and arm == "gepa-ei" else None, "nodes": len(tree), "candidates": len(cands),
            "root_f1": f1_of(tree.root), "root_em": tree.root.evaluation.metrics["em"], "root_sel_recall": tree.root.evaluation.metrics.get("sel_recall"),
            "best_train_sel_recall": best.evaluation.metrics.get("sel_recall"),
            "best_id": best.id, "best_depth": best.depth, "best_train_f1": f1_of(best), "best_train_em": best.evaluation.metrics["em"],
@@ -557,8 +596,12 @@ if __name__ == "__main__":
     ap.add_argument("--bo-gate", choices=["none", "minibatch"], default="none", help="bo: none = surrogate pick gets the full set directly (GP trains on full evals only); minibatch = old two-filter schedule")
     ap.add_argument("--bo-transform", choices=["pit", "none"], default="pit", help="bo: target transform for the surrogate")
     ap.add_argument("--botree-target", choices=["children", "best"], default="children", help="botree: GP target per parent = each child's F1 (repeated observations) or the best child's")
+    ap.add_argument("--q", type=int, default=1, help="gepa / gepa-ei: parents expanded per round once the pool has > 1 member (q chains of reflect/minibatch/full run concurrently)")
+    ap.add_argument("--batch", choices=["topk", "kb", "qei", "quantecarlo"], default="topk", help="gepa-ei, q > 1: how the q are chosen - independent top-q by EI, kriging believer, local Monte Carlo q-EI, or the hosted quantecarlo q-EI")
     ap.add_argument("--pca", type=int, default=0, help="bo/botree: project embeddings to k principal directions (refit per round on fit+candidate rows); 0 = raw 256-d")
     ap.add_argument("--parent-rank", choices=["full", "module"], default="full", help="bo, multi-module: EI on the full posterior or on the round's module component")
     ap.add_argument("--mock", action="store_true")
     ap.add_argument("--out", default="runs/hotpot")
-    asyncio.run(main(ap.parse_args()))
+    _args = ap.parse_args()
+    _args.arms = ["gepa-ei" if a == "gepaei" else a for a in _args.arms]  # old arm id, kept for existing run dirs
+    asyncio.run(main(_args))

@@ -50,7 +50,7 @@ from pathlib import Path
 
 from bpto import (Budget, BudgetExceeded, Dataset, LinearObjective, MockClient, Program, Prompt, Stop, Task, Tree,
                   evaluate, run, select)
-from bpto.bo import EI, GPR, UCB, AdditiveGPR, BOSelector, HashEmbedder, Thompson
+from bpto.bo import EI, GPR, QEI, UCB, AdditiveGPR, BOSelector, HashEmbedder, KrigingBeliever, QuantecarloQEI, Thompson
 from bpto.gepa import ReflectiveExpander, candidates, pareto_pool, pareto_sample
 from bpto.gepa.loop import _accepted, minibatch_for
 from bpto.gepa.select import example_scores
@@ -63,6 +63,19 @@ SKILLS = [f"skill{j}" for j in range(K)]
 DISTRACTORS = [f"word{j}" for j in range(24)]
 TRAPS = ["trap0", "trap1", "trap2"]  # --trap: a trap word lifts every example to >= 0.5 but caps it at 0.6
 VOCAB = SKILLS + DISTRACTORS
+
+
+def set_skills(k: int) -> None:
+    """--skills k: a deeper ladder (2026-09-19). Distractors scale 4:1 so a random addition hits a skill at the same
+    rate; examples need 1..k/3 skills so the climb is k accepted mutations long and the pool is wide mid-search."""
+    global K
+    K = k
+    SKILLS[:] = [f"skill{j}" for j in range(K)]
+    DISTRACTORS[:] = [f"word{j}" for j in range(4 * K)]
+    VOCAB[:] = SKILLS + DISTRACTORS
+    OWNER.clear(); OWNER.update({s: MODULES[0] if j < K // 2 else MODULES[1] for j, s in enumerate(SKILLS)})
+
+
 TRAP_CAP = (0.5, 0.6)
 MODULES = ["A", "B"]
 OWNER = {s: MODULES[0] if j < K // 2 else MODULES[1] for j, s in enumerate(SKILLS)}  # --modules 2: which module a skill counts in
@@ -100,7 +113,7 @@ def make_dataset(n: int, seed: int) -> Dataset:
     rnd = random.Random(seed)
     recs = []
     for i in range(n):
-        need = sorted(rnd.sample(SKILLS, rnd.choice([1, 2, 2, 3])))
+        need = sorted(rnd.sample(SKILLS, rnd.choice([1, 2, 2, 3] if K <= 6 else list(range(1, K // 3 + 1)) + [2])))
         key = f"task {seed}-{i}"
         NEEDS[key] = need
         recs.append({"id": f"e{i}", "inputs": {"x": key}, "answer": need})
@@ -192,9 +205,22 @@ def best_child_se(n, tree):
 
 
 # ---------------------------------------------------------------- arms
-def parent_selector(arm: str, seed: int, r: int, ids: set[str], bo: BOSelector | None, warmup: int, module: str | None = None):
+def parent_selector(arm: str, seed: int, r: int, ids: set[str], bo: BOSelector | None, warmup: int, module: str | None = None,
+                    q: int = 1, log: list | None = None):
+    """`q` > 1 (gepa-weighted and gepaei only, 2026-09-18): q parents per round once the pool has more than one member -
+    q Pareto draws without replacement for gepa, `bo.top(q)` (joint batch acquisition if `bo.batch` is set) for gepaei.
+    The speed question: the same rollouts in fewer rounds, and does a joint pick choose a more useful pair than two draws."""
     mode = {"gepa-weighted": "weighted", "gepa-uniform": "uniform", "gepa-best": "best", "gepa-all": "all"}.get(arm, "weighted")
     base = pareto_sample(1, mode=mode, seed=seed * 7919 + r, ids=ids)
+    if arm == "gepa-weighted" and q > 1:
+        def _gepa_q(tree):
+            cands = candidates(tree, ids)
+            k = min(q, len(cands)) if len(cands) > 1 else 1
+            picks = pareto_sample(k, mode=mode, seed=seed * 7919 + r, ids=ids)(tree)
+            if log is not None:
+                log.append({"round": r, "n_cands": len(cands), "q": k, "sibling": len({n.parent_id for n in picks}) < len(picks)})
+            return picks
+        return _gepa_q
     if not (arm.startswith("bo") or arm == "gepaei"):
         return base
 
@@ -203,10 +229,17 @@ def parent_selector(arm: str, seed: int, r: int, ids: set[str], bo: BOSelector |
             # the pool grows one gate-passer at a time: warm up until every current candidate (up to `warmup`) has been tried
             cands = candidates(tree, ids)
             trained = [n for n in cands if bo.value(n, tree) is not None]
+            k = min(q, len(cands)) if len(cands) > 1 else 1
             if len(trained) < min(warmup, len(cands)):
-                return base(tree)
-            ranked = await bo.rank(tree, cands)
-            return [n for _, n in ranked[:1]]
+                picks = pareto_sample(k, mode=mode, seed=seed * 7919 + r, ids=ids)(tree)
+                rec = {"warmup": True}
+            else:
+                picks = await bo.top(k, among=lambda t: cands)(tree)
+                b = bo.last_fit.get("batch")
+                rec = {"warmup": False, "flat": bo.last_fit.get("flat"), "batch_differs": None if not b else set(b["ids"]) != set(b["top_k_ids"])}
+            if log is not None:
+                log.append({"round": r, "n_cands": len(cands), "q": k, "sibling": len({n.parent_id for n in picks}) < len(picks), **rec})
+            return picks
         expanded = [n for n in tree if n.state == "expanded" and best_child(n, tree) is not None]
         if len(expanded) < warmup:
             return base(tree)
@@ -258,7 +291,8 @@ def best_full_child_se(n, tree):
     return se_of("acc")(max(kids, key=lambda c: c.score), tree) if kids else None
 
 
-def make_schedule(arm: str, seed: int, minibatch: int, warmup: int, modules: int = 1, use_noise: bool = True):
+def make_schedule(arm: str, seed: int, minibatch: int, warmup: int, modules: int = 1, use_noise: bool = True,
+                  q: int = 1, batch=None, log: list | None = None):
     screen = arm.endswith("+screen")
     if arm.startswith("bo-pure"):
         # bo-pure[-<value>-<acq>]: value in {child (best full child), own}; acq in {ei, ucb, ts}
@@ -309,7 +343,7 @@ def make_schedule(arm: str, seed: int, minibatch: int, warmup: int, modules: int
     else:
         if arm == "gepaei":
             parent_bo = BOSelector(HashEmbedder(dim=128), GPR(), EI(), value=child_est, noise=child_est_se if use_noise else None,
-                                   transform="pit", pca=4)
+                                   transform="pit", pca=4, batch=batch)
         else:
             parent_bo = BOSelector(HashEmbedder(dim=128), GPR(), EI(), value=best_child) if arm.startswith("bo") else None
         child_bo = BOSelector(HashEmbedder(dim=128), GPR(), EI(), value=own_score) if screen else None
@@ -339,7 +373,7 @@ def make_schedule(arm: str, seed: int, minibatch: int, warmup: int, modules: int
         fb = FEEDBACK2 if modules > 1 else feedback
         return [
             step(ReflectiveExpander(fb, minibatch=minibatch, n=3 if screen else 1, seed=seed + r, module=module),
-                 parent_selector(arm.replace("+screen", ""), seed, r, ids, parent_bo, warmup, module), name="reflect"),
+                 parent_selector(arm.replace("+screen", ""), seed, r, ids, parent_bo, warmup, module, q=q, log=log), name="reflect"),
             step(evaluate(dataset=mb), to_minibatch, name="minibatch"),
             step(evaluate(dataset=full), lambda t: _accepted(t, select.where(on_mb)(t)), name="full"),
         ]
@@ -358,13 +392,28 @@ async def run_arm(arm: str, seed: int, args) -> list[tuple[int, float]]:
                 scorer=scorer(args.noise, seed, args.modules, args.interaction), objective=LinearObjective(acc=1.0), client=client)
     tree = Tree(task)
     curve: list[tuple[int, float]] = []
+    rounds: list[tuple[int, int]] = []  # (calls, round) - the speed readout: rounds to reach a score, not rollouts
+    log: list[dict] = []
 
     def record(tree, r, st):
         best = max((n for n in candidates(tree)), key=lambda n: n.score, default=None)
         curve.append((client.usage.calls, true_score(best, dataset, args.interaction) if best else 0.0))
-    await run(tree, make_schedule(arm, seed, args.minibatch, args.warmup, args.modules, not args.no_noise), stop=Stop(rounds=10_000), on_step=record)
+        rounds.append((client.usage.calls, r))
+    batch = make_batch(args, seed) if arm == "gepaei" else None
+    await run(tree, make_schedule(arm, seed, args.minibatch, args.warmup, args.modules, not args.no_noise, q=args.q, batch=batch, log=log),
+              stop=Stop(rounds=10_000), on_step=record)
     curve.append((client.usage.calls, curve[-1][1] if curve else 0.0))
-    return curve
+    return {"curve": curve, "rounds": rounds, "log": log, "pool": len(candidates(tree)), "nodes": len(tree)}
+
+
+def make_batch(args, seed):
+    if args.q <= 1 or args.batch == "topk":
+        return None
+    if args.batch == "kb":
+        return KrigingBeliever()
+    if args.batch == "qei":
+        return QEI(seed=seed)
+    return QuantecarloQEI(seed=seed)
 
 
 def best_at(curve, calls: int) -> float:
@@ -382,24 +431,44 @@ ARMS2 = ["gepa-rr", "bo-concat+screen", "bo-additive+screen", "bo-additive-comp+
 
 
 async def main(args):
+    if getattr(args, "skills", 6) != 6:
+        set_skills(args.skills)
     out = Path(args.out); out.mkdir(parents=True, exist_ok=True)
     grid = list(range(0, args.budget + 1, args.budget // 20))
     results = {}
     for arm in (args.arms or (ARMS2 if args.modules > 1 else ARMS)):
-        curves = [await run_arm(arm, s, args) for s in range(args.seeds)]
+        runs = [await run_arm(arm, s, args) for s in range(args.seeds)]
+        curves = [x["curve"] for x in runs]
         mat = [[best_at(c, g) for g in grid] for c in curves]
         mean = [statistics.mean(col) for col in zip(*mat)]
         se = [statistics.stdev(col) / len(col) ** 0.5 if len(col) > 1 else 0.0 for col in zip(*mat)]
         reach = [next((c for c, s in cv if s >= args.target), None) for cv in curves]
+        # rounds at which the target was reached (the round of the first step whose call count is >= reach)
+        reach_rounds = [next((rr for c, rr in x["rounds"] if c >= rc), None) if rc is not None else None for x, rc in zip(runs, reach)]
+        total_rounds = [x["rounds"][-1][1] if x["rounds"] else 0 for x in runs]
+        logs = [e for x in runs for e in x["log"]]
+        multi = [e for e in logs if e["q"] > 1]
         results[arm] = {"grid": grid, "mean": mean, "se": se, "final": mean[-1], "final_se": se[-1],
                         "reached_target": sum(r is not None for r in reach) / len(reach),
-                        "median_calls_to_target": statistics.median([r for r in reach if r is not None]) if any(r is not None for r in reach) else None}
-        print(f"{arm:14s} final {mean[-1]:.3f} ± {se[-1]:.3f}   reached {args.target:.2f}: {results[arm]['reached_target']:.0%}"
-              f"   median calls to target: {results[arm]['median_calls_to_target']}", flush=True)
+                        "median_calls_to_target": statistics.median([r for r in reach if r is not None]) if any(r is not None for r in reach) else None,
+                        "median_rounds_to_target": statistics.median([r for r in reach_rounds if r is not None]) if any(r is not None for r in reach_rounds) else None,
+                        "median_rounds_total": statistics.median(total_rounds), "mean_pool": statistics.mean(x["pool"] for x in runs),
+                        "max_pool": max(x["pool"] for x in runs), "q": args.q, "batch": args.batch if args.q > 1 else None,
+                        "q_rounds": len(multi), "q_rounds_share": len(multi) / max(1, len(logs)),
+                        "sibling_pairs": sum(e["sibling"] for e in multi), "batch_differs": sum(bool(e.get("batch_differs")) for e in multi),
+                        "flat_fits": sum(bool(e.get("flat")) for e in multi),
+                        "per_seed": {"final": [c[-1][1] for c in curves], "calls_to_target": reach, "rounds_to_target": reach_rounds,
+                                     "rounds_total": total_rounds, "pool": [x["pool"] for x in runs]}}
+        rr = results[arm]
+        print(f"{arm:14s} final {mean[-1]:.3f} ± {se[-1]:.3f}   reached {args.target:.2f}: {rr['reached_target']:.0%}"
+              f"   median calls to target: {rr['median_calls_to_target']}   median rounds to target: {rr['median_rounds_to_target']}"
+              f"   rounds total {rr['median_rounds_total']}   pool {rr['mean_pool']:.1f} (max {rr['max_pool']})"
+              + (f"   q-rounds {rr['q_rounds_share']:.0%}, sibling pairs {rr['sibling_pairs']}/{rr['q_rounds']}, batch≠top-q {rr['batch_differs']}, flat {rr['flat_fits']}" if args.q > 1 else ""),
+              flush=True)
     (out / "results.json").write_text(json.dumps({"args": vars(args), "results": results}, indent=1))
-    lines = [f"| arm | final (mean ± SE, n={args.seeds}) | reached {args.target} | median rollouts to target |", "|---|---|---|---|"]
+    lines = [f"| arm | q | batch | final (mean ± SE, n={args.seeds}) | reached {args.target} | median rollouts to target | median rounds to target | rounds total | pool (mean/max) | sibling pairs | batch ≠ top-q |", "|---|---|---|---|---|---|---|---|---|---|---|"]
     for arm, r in results.items():
-        lines.append(f"| {arm} | {r['final']:.3f} ± {r['final_se']:.3f} | {r['reached_target']:.0%} | {r['median_calls_to_target']} |")
+        lines.append(f"| {arm} | {r['q']} | {r['batch'] or '-'} | {r['final']:.3f} ± {r['final_se']:.3f} | {r['reached_target']:.0%} | {r['median_calls_to_target']} | {r['median_rounds_to_target']} | {r['median_rounds_total']} | {r['mean_pool']:.1f}/{r['max_pool']} | {r['sibling_pairs']}/{r['q_rounds']} | {r['batch_differs']} |")
     (out / "table.md").write_text("\n".join(lines) + "\n")
     print("\n".join(lines))
     try:
@@ -433,6 +502,9 @@ if __name__ == "__main__":
     ap.add_argument("--interaction", action="store_true", help="--modules 2: non-additive bonus when A has skill0 and B has skill3")
     ap.add_argument("--target", type=float, default=0.9)
     ap.add_argument("--trap", action="store_true", help="deceptive landscape: trap words lift the mean to 0.5-0.6 and cap it there")
+    ap.add_argument("--skills", type=int, default=6, help="planted skills K (6 = the original ladder; 12 = twice the climb)")
+    ap.add_argument("--q", type=int, default=1, help="gepa-weighted / gepaei: parents per round once the pool has > 1 member")
+    ap.add_argument("--batch", choices=["topk", "kb", "qei", "quantecarlo"], default="qei", help="gepaei, q > 1: batch acquisition")
     ap.add_argument("--arms", nargs="*")
     ap.add_argument("--out", default="experiments/synthetic-ladder")
     asyncio.run(main(ap.parse_args()))

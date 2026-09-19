@@ -114,7 +114,11 @@ class QuantecarloQEI:
     over the wire, the surrogate does not. Everything `BOSelector` fits - noise, PIT, incumbent, PCA, module
     blocks - stays as it is; this is the third implementation of the same (mean, cov, best_y, q) -> indices
     contract as `QEI` above, with an exhaustive / screened search over subsets instead of greedy construction.
-    Requires the `quantecarlo` package (>= 0.7); `client` is a `quantecarlo.QEIClient` or None for the default.
+    The service scores improvement on exp of the posterior it is sent (q-EI on a lognormal objective), so the
+    posterior must be normal-scale: `BOSelector`'s `transform="pit"` gives exactly that, and `best_y` must be
+    on the same scale. A raw-scale `best_y` is not refused; the response carries a warning and the client
+    logs it. Picks therefore differ from `QEI` (plain EI on the PIT scale) by design, not by error.
+    Requires the `quantecarlo` package (>= 0.7.1); `client` is a `quantecarlo.QEIClient` or None for the default.
     `**select` are per-call `QEIClient.select` fields (pi_floor, seed, ei_budget, dtype, ...)."""
 
     def __init__(self, client=None, **select):
