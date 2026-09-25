@@ -187,7 +187,7 @@ async def test_reflective_expander_passed_hook_orders_failures_first():
 
 # ---- gate rungs, reflector rows, context hook ----------------------------------------
 
-from bpto.gepa import gate_steps, minibatch_for, paired_change, ties_parent
+from bpto.gepa import gate_steps, minibatch_for, paired_change, unclear
 
 WIDE = [{"id": f"w{i}", "inputs": {"q": f"q{i}"}, "answer": f"a{i}"} for i in range(12)]
 
@@ -203,18 +203,19 @@ def test_paired_change_and_ties():
     swap = fake_eval(tree, tree.add_child(tree.root, "A {q}", Origin(op="reflect")), {"e0", "e2"})
     same = fake_eval(tree, tree.add_child(tree.root, "B {q}", Origin(op="reflect")), {"e0", "e1"})
     better = fake_eval(tree, tree.add_child(tree.root, "C {q}", Origin(op="reflect")), {"e0", "e1", "e2"})
-    assert paired_change(tree, swap) == (1, 1) and ties_parent(tree, swap)
-    assert paired_change(tree, same) == (0, 0) and not ties_parent(tree, same)      # inert: more rows can't help
-    assert paired_change(tree, better) == (1, 0) and not ties_parent(tree, better)
+    assert paired_change(tree, swap) == (1, 1) and unclear(tree, swap, margin=0)
+    assert paired_change(tree, same) == (0, 0) and not unclear(tree, same)          # inert: more rows can't help
+    assert paired_change(tree, better) == (1, 0) and not unclear(tree, better, margin=0)
+    assert unclear(tree, better, margin=1)                                          # a one-row win is not evidence
     assert paired_change(tree, tree.root) is None
     half = tree.add_child(tree.root, "D {q}", Origin(op="reflect"))   # continuous scores: +0.5 and -0.5 cancel
     half.evaluation = Evaluation(per_example=[ExampleResult(example_id="e0", output="", metrics={"accuracy": 0.5}),
                                               ExampleResult(example_id="e2", output="", metrics={"accuracy": 0.5})],
                                  metrics={}, metrics_std={}, n=2, score=0.5, feasible=True, dataset_ids=["e0", "e2"])
-    assert paired_change(tree, half) == (1, 1) and ties_parent(tree, half)
+    assert paired_change(tree, half) == (1, 1) and unclear(tree, half, margin=0)
     half.evaluation.per_example[1].metrics["accuracy"] = 0.25
     half.evaluation.score = 0.375
-    assert paired_change(tree, half) == (1, 1) and not ties_parent(tree, half)   # fixed == broke but a net loss
+    assert not unclear(tree, half, margin=0) and unclear(tree, half, margin=0.25)   # fixed == broke, net -0.25
 
 
 def test_gate_steps_validates_rungs():
@@ -248,6 +249,7 @@ async def test_extend_resolves_a_tie_on_a_nested_rung():
     child = next(n for n in tree.nodes.values() if n.origin.op == "reflect")
     assert set(child.evaluation.dataset_ids) == {ex.id for ex in ds}   # accepted after the rung
     assert "gepa/r1/extend6" in [s["step"] for s in res.history]
+    assert tree.meta["gate"][child.id] == {"round": 1, "outcome": "passed", "rows": 6, "fixed": 5, "broke": 1}
     # without the rung the same tie is rejected
     tree = Tree(wide_task(_swap_handler({mb2[0]}, {mb2[1], *mb6[2:]})))
     await run(tree, gepa(minibatch=2, seed=seed), stop=Stop(rounds=2))
@@ -260,6 +262,26 @@ async def test_extend_skips_inert_children():
     await run(tree, gepa(minibatch=2, extend=(6,), seed=5), stop=Stop(rounds=2))
     child = next(n for n in tree.nodes.values() if n.origin.op == "reflect")
     assert len(child.evaluation.dataset_ids) == 2
+    assert tree.meta["gate"][child.id]["outcome"] == "inert"
+
+
+async def test_extend_catches_a_narrow_minibatch_win():
+    """Run 6's false pass: +1 row on the minibatch, worse on more rows. With a margin it is checked, not accepted."""
+    ds, seed = Dataset.from_records(WIDE), 5
+    mb6 = [int(ex.id[1:]) for ex in minibatch_for(1, ds, 6, seed)]
+    root_ok, child_ok = set(mb6[2:]), {mb6[0]}                      # child +1 on the 2 rows, -4 on the next 4
+    tree = Tree(wide_task(_swap_handler(root_ok, child_ok)))
+    await run(tree, gepa(minibatch=2, extend=(6,), seed=seed), stop=Stop(rounds=2))
+    child = next(n for n in tree.nodes.values() if n.origin.op == "reflect")
+    assert len(child.evaluation.dataset_ids) == 6
+    assert tree.meta["gate"][child.id] == {"round": 1, "outcome": "rejected", "rows": 6, "fixed": 1, "broke": 4}
+    # without rungs (GEPA's gate) the same child buys a full evaluation; with margin=0 only exact ties are extended
+    for kw in ({}, {"extend": (6,), "margin": 0}):
+        tree = Tree(wide_task(_swap_handler(root_ok, child_ok)))
+        await run(tree, gepa(minibatch=2, seed=seed, **kw), stop=Stop(rounds=2))
+        child = next(n for n in tree.nodes.values() if n.origin.op == "reflect")
+        assert len(child.evaluation.dataset_ids) == len(ds)
+    assert "gate" in tree.meta and "gate" not in Tree(wide_task(_swap_handler(root_ok, child_ok))).meta
 
 
 async def test_reflect_rows_and_context_hook():

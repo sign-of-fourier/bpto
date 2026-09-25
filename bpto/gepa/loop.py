@@ -53,37 +53,57 @@ def paired_change(tree: Tree, child: Node) -> tuple[int, int] | None:
     return sum(cs[i] > ps[i] for i in cs), sum(cs[i] < ps[i] for i in cs)
 
 
-def ties_parent(tree: Tree, child: Node) -> bool:
-    """Same per-example total as the parent on its rows, but not inert either: some rows changed and the changes
-    cancel. The case a larger (nested) batch can resolve; an inert child or a clear loser gains nothing from more rows."""
-    pc = paired_change(tree, child)
-    if pc is None or pc == (0, 0) or beats_parent(tree, child):
-        return False
+def _net(tree: Tree, child: Node) -> float:
+    """Child minus parent, summed over the child's rows (in rows, for a 0/1 metric)."""
     ps, cs = example_scores(tree, tree.nodes[child.parent_id]), example_scores(tree, child)
-    return abs(sum(cs[i] - ps[i] for i in cs)) < 1e-9
+    return sum(cs[i] - ps[i] for i in cs)
 
 
-def gate_steps(r: int, full: Dataset, minibatch: int, seed: int, extend: Sequence[int] = (),
+def unclear(tree: Tree, child: Node, margin: float = 1.0) -> bool:
+    """Some rows changed, but the net over the child's rows is within `margin` rows of zero either way (0 = exact
+    ties only): the case a larger (nested) batch can resolve. Inert children and clear wins / losses are decided."""
+    pc = paired_change(tree, child)
+    return pc is not None and pc != (0, 0) and abs(_net(tree, child)) <= margin + 1e-9
+
+
+def gate_steps(r: int, full: Dataset, minibatch: int, seed: int, extend: Sequence[int] = (), margin: float = 1.0,
                tag: str | None = None, op: str = "reflect") -> list[Step]:
     """The survive seat for round r: evaluate this round's new children (origin.op == `op`) on a `minibatch`-row
-    batch; with `extend`, re-evaluate the children that tie their parent on each larger rung in turn (the rungs are
-    prefixes of one seeded shuffle, so each contains the last and its rows hit the completion cache); give the full set to the
-    children that beat their parent on the largest batch they reached. `extend=()` is GEPA's single strict gate."""
+    batch and give the full set to those that beat their parent on it. `extend=()` is GEPA's single strict gate.
+
+    With `extend=(k, ...)`, a child whose result is `unclear` (a tie with changed rows, or a net within `margin` rows
+    either way) is re-evaluated on each larger rung in turn - prefixes of one seeded shuffle, so each contains the
+    last and its rows hit the completion cache; the parent's rows come from its full evaluation. It is accepted only
+    if it beats its parent on the largest batch it reached. Each child's outcome (inert / passed / rejected, rows,
+    fixed, broke) is recorded in `tree.meta["gate"][node_id]`."""
     sizes = [minibatch, *extend]
     if extend and (any(b <= a for a, b in zip(sizes, sizes[1:])) or sizes[-1] >= len(full)):
         raise ValueError(f"extend rungs must increase from minibatch={minibatch} and stay below the full set "
                          f"({len(full)} rows): {list(extend)}")
     tag = tag or f"gepa/r{r}"
     ids = {ex.id for ex in full}
+    rungs = [frozenset(ex.id for ex in minibatch_for(r, full, k, seed)) for k in sizes]
     is_new = lambda n: n.origin.op == op and n.evaluation is None
     on_minibatch = lambda n: n.origin.op == op and n.evaluation is not None and not ids.issubset(set(n.evaluation.dataset_ids))
     steps = [step(evaluate(dataset=minibatch_for(r, full, minibatch, seed)), S.where(is_new), name=f"{tag}/minibatch")]
-    for prev, k in zip(sizes, sizes[1:]):
-        prev_ids = {ex.id for ex in minibatch_for(r, full, prev, seed)}
-        tied = lambda t, prev_ids=prev_ids: [n for n in S.where(on_minibatch)(t)
-                                             if set(n.evaluation.dataset_ids) == prev_ids and ties_parent(t, n)]
+    for prev, k in zip(rungs, sizes[1:]):
+        tied = lambda t, prev=prev: [n for n in S.where(on_minibatch)(t)
+                                     if set(n.evaluation.dataset_ids) == prev and unclear(t, n, margin)]
         steps.append(step(evaluate(dataset=minibatch_for(r, full, k, seed)), tied, name=f"{tag}/extend{k}"))
-    steps.append(step(evaluate(dataset=full), lambda t: _accepted(t, S.where(on_minibatch)(t)), name=f"{tag}/full"))
+
+    def decide(t: Tree) -> list[Node]:
+        pool = S.where(on_minibatch)(t)
+        accepted = _accepted(t, pool)
+        if extend:  # record this round's children (the ones evaluated on one of its rungs)
+            log = t.meta.setdefault("gate", {})
+            for n in pool:
+                if frozenset(n.evaluation.dataset_ids) in rungs:
+                    fixed, broke = paired_change(t, n) or (0, 0)
+                    outcome = "passed" if n in accepted else "inert" if (fixed, broke) == (0, 0) else "rejected"
+                    log[n.id] = {"round": r, "outcome": outcome, "rows": len(n.evaluation.dataset_ids),
+                                 "fixed": fixed, "broke": broke}
+        return accepted
+    steps.append(step(evaluate(dataset=full), decide, name=f"{tag}/full"))
     return steps
 
 
@@ -91,13 +111,14 @@ def gepa(feedback: Feedback | dict[str, Feedback] = default_feedback, *, minibat
          n: int = 1, mode: str = "weighted", pareto_dataset: Dataset | None = None, seed: int = 0,
          expander_config: ModelConfig | None = None, modules: Sequence[str] | None = None,
          passed: Passed | dict[str, Passed] | None = None, reflect_rows: int | None = None,
-         extend: Sequence[int] = (), context: Context | None = None) -> Callable[[Tree, int], list[Step]]:
+         extend: Sequence[int] = (), margin: float = 1.0, context: Context | None = None) -> Callable[[Tree, int], list[Step]]:
     """Schedule factory: `run(tree, gepa(feedback), stop=Stop(...))`. Round 0 evaluates the root.
 
     `modules`: on Program nodes, GEPA's round-robin - round r rewrites `modules[r % len(modules)]` (one module per
     child); `feedback` / `passed` may then be dicts keyed by module. None rewrites the entry module every round.
     `minibatch` is the gate's batch; `reflect_rows` the number of traces shown to the reflector (default: the same,
-    as in GEPA). `extend`: larger nested batches for children that tie their parent (see `gate_steps`).
+    as in GEPA). `extend` / `margin`: larger nested batches for children whose minibatch result is unclear (a tie, or
+    within `margin` rows either way; see `gate_steps`).
     `context`: text above the reflector's examples (see `ReflectiveExpander`)."""
     def schedule(tree: Tree, r: int) -> list[Step]:
         module = modules[r % len(modules)] if modules else None
@@ -110,6 +131,6 @@ def gepa(feedback: Feedback | dict[str, Feedback] = default_feedback, *, minibat
             step(ReflectiveExpander(feedback, minibatch=reflect_rows or minibatch, n=n, seed=seed + r,
                                     config=expander_config, module=module, passed=passed, context=context),
                  pareto_sample(parents_per_round, mode=mode, seed=seed + r, ids=ids), name=f"{tag}/reflect"),
-            *gate_steps(r, full, minibatch, seed, extend, tag=tag),
+            *gate_steps(r, full, minibatch, seed, extend, margin, tag=tag),
         ]
     return schedule
