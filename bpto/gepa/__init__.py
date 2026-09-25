@@ -4,9 +4,9 @@ budget; only parent selection (Pareto pool + stochastic sampling) and mutation (
 feedback) differ. Built to be taken apart: each ingredient is a switch or a selector so BO can
 replace one at a time.
 """
-from .loop import beats_parent, gepa, minibatch_for
-from .reflect import REFLECT_PROMPT, Feedback, ReflectiveExpander, default_feedback
+from .loop import beats_parent, gate_steps, gepa, minibatch_for, paired_change, ties_parent
+from .reflect import REFLECT_PROMPT, Context, Feedback, ReflectiveExpander, default_feedback
 from .select import candidates, example_scores, pareto_pool, pareto_sample
 
-__all__ = ["gepa", "beats_parent", "minibatch_for", "ReflectiveExpander", "REFLECT_PROMPT", "Feedback",
-           "default_feedback", "pareto_pool", "pareto_sample", "candidates", "example_scores"]
+__all__ = ["gepa", "beats_parent", "gate_steps", "paired_change", "ties_parent", "minibatch_for", "ReflectiveExpander",
+           "REFLECT_PROMPT", "Context", "Feedback", "default_feedback", "pareto_pool", "pareto_sample", "candidates", "example_scores"]

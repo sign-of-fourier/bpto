@@ -183,3 +183,110 @@ async def test_reflective_expander_passed_hook_orders_failures_first():
     exp = ReflectiveExpander(minibatch=1, passed=lambda ex, r: ex.id != "e1")   # ...but the task says e1 is the failure
     await exp.apply(tree, [tree.root])
     assert "q: q1" in seen["prompt"] and "q: q3" not in seen["prompt"]
+
+
+# ---- gate rungs, reflector rows, context hook ----------------------------------------
+
+from bpto.gepa import gate_steps, minibatch_for, paired_change, ties_parent
+
+WIDE = [{"id": f"w{i}", "inputs": {"q": f"q{i}"}, "answer": f"a{i}"} for i in range(12)]
+
+
+def wide_task(handler):
+    return Task(root="Answer {q}", description="answers", dataset=Dataset.from_records(WIDE), schema=Out,
+                scorer=exact_match(field="answer"), objective=LinearObjective(accuracy=1.0), client=MockClient(handler))
+
+
+def test_paired_change_and_ties():
+    tree = Tree(make_task(lambda p, c, s: Out(answer="")))
+    fake_eval(tree, tree.root, {"e0", "e1"})
+    swap = fake_eval(tree, tree.add_child(tree.root, "A {q}", Origin(op="reflect")), {"e0", "e2"})
+    same = fake_eval(tree, tree.add_child(tree.root, "B {q}", Origin(op="reflect")), {"e0", "e1"})
+    better = fake_eval(tree, tree.add_child(tree.root, "C {q}", Origin(op="reflect")), {"e0", "e1", "e2"})
+    assert paired_change(tree, swap) == (1, 1) and ties_parent(tree, swap)
+    assert paired_change(tree, same) == (0, 0) and not ties_parent(tree, same)      # inert: more rows can't help
+    assert paired_change(tree, better) == (1, 0) and not ties_parent(tree, better)
+    assert paired_change(tree, tree.root) is None
+    half = tree.add_child(tree.root, "D {q}", Origin(op="reflect"))   # continuous scores: +0.5 and -0.5 cancel
+    half.evaluation = Evaluation(per_example=[ExampleResult(example_id="e0", output="", metrics={"accuracy": 0.5}),
+                                              ExampleResult(example_id="e2", output="", metrics={"accuracy": 0.5})],
+                                 metrics={}, metrics_std={}, n=2, score=0.5, feasible=True, dataset_ids=["e0", "e2"])
+    assert paired_change(tree, half) == (1, 1) and ties_parent(tree, half)
+    half.evaluation.per_example[1].metrics["accuracy"] = 0.25
+    half.evaluation.score = 0.375
+    assert paired_change(tree, half) == (1, 1) and not ties_parent(tree, half)   # fixed == broke but a net loss
+
+
+def test_gate_steps_validates_rungs():
+    ds = Dataset.from_records(WIDE)
+    with pytest.raises(ValueError):
+        gate_steps(1, ds, 4, 0, extend=(4,))
+    with pytest.raises(ValueError):
+        gate_steps(1, ds, 4, 0, extend=(8, 12))                     # 12 = the full set: would skip the gate
+    assert [s.name for s in gate_steps(1, ds, 4, 0)] == ["gepa/r1/minibatch", "gepa/r1/full"]
+    assert len(gate_steps(1, Dataset.from_records(RECORDS), 8, 0)) == 2   # minibatch >= |full| without rungs: as before
+
+
+def _swap_handler(root_ok: set[int], child_ok: set[int]):
+    def handler(prompt, cfg, schema):
+        if schema is Variants:
+            return Variants(prompts=["Answer {q} +"])
+        i = int(re.search(r"q(\d+)", prompt).group(1))
+        ok = child_ok if "+" in prompt else root_ok
+        return Out(answer=f"a{i}" if i in ok else "wrong")
+    return handler
+
+
+async def test_extend_resolves_a_tie_on_a_nested_rung():
+    ds, seed = Dataset.from_records(WIDE), 5
+    mb2 = [int(ex.id[1:]) for ex in minibatch_for(1, ds, 2, seed)]
+    mb6 = [int(ex.id[1:]) for ex in minibatch_for(1, ds, 6, seed)]
+    assert mb6[:2] == mb2                                           # rungs are nested
+    # on the 2-row batch the child fixes one row and breaks the other; the next four rows only the child gets right
+    tree = Tree(wide_task(_swap_handler({mb2[0]}, {mb2[1], *mb6[2:]})))
+    res = await run(tree, gepa(minibatch=2, extend=(6,), seed=seed), stop=Stop(rounds=2))
+    child = next(n for n in tree.nodes.values() if n.origin.op == "reflect")
+    assert set(child.evaluation.dataset_ids) == {ex.id for ex in ds}   # accepted after the rung
+    assert "gepa/r1/extend6" in [s["step"] for s in res.history]
+    # without the rung the same tie is rejected
+    tree = Tree(wide_task(_swap_handler({mb2[0]}, {mb2[1], *mb6[2:]})))
+    await run(tree, gepa(minibatch=2, seed=seed), stop=Stop(rounds=2))
+    child = next(n for n in tree.nodes.values() if n.origin.op == "reflect")
+    assert len(child.evaluation.dataset_ids) == 2
+
+
+async def test_extend_skips_inert_children():
+    tree = Tree(wide_task(_swap_handler({0, 1, 2}, {0, 1, 2})))      # the rewrite changes no answer
+    await run(tree, gepa(minibatch=2, extend=(6,), seed=5), stop=Stop(rounds=2))
+    child = next(n for n in tree.nodes.values() if n.origin.op == "reflect")
+    assert len(child.evaluation.dataset_ids) == 2
+
+
+async def test_reflect_rows_and_context_hook():
+    seen = []
+
+    def handler(prompt, cfg, schema):
+        if schema is Variants:
+            seen.append(prompt)
+            return Variants(prompts=["Answer {q} +"])
+        return Out(answer="wrong")
+
+    def confusion(tree, src):
+        return f"SUMMARY of {src.id}: all wrong"
+    tree = Tree(wide_task(handler))
+    await run(tree, gepa(minibatch=4, reflect_rows=1, context=confusion, seed=0), stop=Stop(rounds=2))
+    child = next(n for n in tree.nodes.values() if n.origin.op == "reflect")
+    assert len(child.origin.params["minibatch_ids"]) == 1 and child.origin.params["context"] == "confusion"
+    assert f"SUMMARY of {tree.root.id}: all wrong" in seen[0] and "### Example 2" not in seen[0]
+    assert len(child.evaluation.dataset_ids) == 4                    # the gate batch is still `minibatch`
+
+
+async def test_defaults_render_the_same_meta_prompt():
+    """No context, no reflect_rows: the meta-prompt (a cache key) and origin params are what they were."""
+    seen = []
+    tree = Tree(wide_task(lambda p, c, s: (seen.append(p), Variants(prompts=["Answer {q} +"]))[1] if s is Variants
+                          else Out(answer="wrong")))
+    await run(tree, gepa(minibatch=3, seed=0), stop=Stop(rounds=2))
+    child = next(n for n in tree.nodes.values() if n.origin.op == "reflect")
+    assert "context" not in child.origin.params and len(child.origin.params["minibatch_ids"]) == 3
+    assert "feedback on each:\n\n### Example 1\n" in seen[0]
