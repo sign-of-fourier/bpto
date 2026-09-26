@@ -1,0 +1,83 @@
+run 0da81d534e4b -> runs/leadqual_studio/runs/0da81d534e4b
+example L28608 on node 926e49eea9 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28102 on node db6f1759b1 failed: An error occurred (ResourceNotFoundException) when calling the Converse operation: Inference Profile ARN not found
+example L27081 on node 186af88e11 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26300 on node 186af88e11 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27338 on node 186af88e11 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27729 on node 45ec8fa4e1 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26531 on node db6f1759b1 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+{
+  "state": "done",
+  "error": null,
+  "round": 9,
+  "spent_usd": 0.6644026399999998,
+  "train_rows": 2400,
+  "holdout_rows": 600,
+  "nondeterminism_band": 0.0,
+  "accepted": 4,
+  "proposed": 7
+}
+{
+  "stopped_because": "no improvement for 8 rounds",
+  "rounds": 10,
+  "root_score": 0.5316666666666666,
+  "holdout": {
+    "best": {
+      "accuracy": 0.59,
+      "output_tokens": 15.38,
+      "prompt_tokens": 683.1033333333334,
+      "template_tokens": 523.1266666666667
+    },
+    "root": {
+      "accuracy": 0.515,
+      "output_tokens": 15.096666666666666,
+      "prompt_tokens": 597.275,
+      "template_tokens": 428.0
+    },
+    "best_score": 0.59,
+    "root_score": 0.515,
+    "se": {
+      "accuracy": 0.02008838600115696,
+      "output_tokens": 0.13843789987365704,
+      "prompt_tokens": 1.2560227414961247,
+      "template_tokens": 0.0
+    }
+  },
+  "spent_usd": 0.6644026399999998
+}
+
+--- best prompt ---
+You are qualifying inbound leads for Tallyforge, a revenue forecasting and pipeline analytics platform that connects to a company's CRM and data warehouse. Read the lead and decide what happens to it next.
+
+LEAD
+Source: {source}
+Created: {created_at}
+Name / title: {first_name}, {title}
+Company: {company} ({email_domain})
+Industry: {snap_industry}
+Employees: {snap_headcount}
+Funding: {snap_funding_stage}, {snap_months_since_funding} months since last round
+Tech stack: {snap_tech_stack}
+Hiring for sales/RevOps roles: {snap_hiring_signal}
+Existing customer: {is_existing_customer}
+Partner: {is_partner}
+Message: {message_text}
+
+HOW WE ROUTE
+1. existing_customer: they already pay us (Existing customer = True). Goes to their CSM, no matter what they wrote.
+2. partner_route: they work at one of our partners (Partner = True). Partners go to the channel team even when they say they're bringing a client.
+3. rejected_fit: not our ICP. Our ICP is B2B companies with roughly 50 to 5,000 employees, ideally SaaS, fintech or other tech, that run Salesforce or HubSpot. The person should work in RevOps, sales ops, sales leadership or finance, at manager level or above. Students, job seekers, very small companies, government, education and nonprofits are not a fit.
+4. rejected_no_intent: a good fit, but not in-market now. Content downloads and event badge scans are usually just research unless the message describes an active project. No message at all counts as no intent.
+5. accepted: a good fit AND buying now: demo requests, referrals, a specific problem they want solved, a named timeline or budget, evaluating or replacing another tool, a recent funding round or hiring in revenue roles. Spam, sales pitches and nonsense are never accepted.
+
+Check the rules in order and use the first one that applies.
+
+Before applying the rules, ensure the lead meets the basic ICP criteria:
+- Company size: 50 to 5,000 employees
+- Industry: SaaS, fintech, or other tech
+- Tech stack: Salesforce or HubSpot
+- Role: RevOps, sales ops, sales leadership, or finance at manager level or above
+
+If the lead does not meet these basic ICP criteria, classify it as'rejected_fit'. If it meets the criteria, proceed with the rules.
+
+Answer with exactly one of: accepted, rejected_fit, rejected_no_intent, existing_customer, partner_route

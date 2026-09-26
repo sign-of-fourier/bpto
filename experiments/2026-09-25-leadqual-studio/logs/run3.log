@@ -1,0 +1,78 @@
+run 26ebbdc9b43c -> runs/leadqual_studio/runs/26ebbdc9b43c
+example L26010 on node 935313899d failed: An error occurred (ResourceNotFoundException) when calling the Converse operation: Inference Profile ARN not found
+{
+  "state": "done",
+  "error": null,
+  "round": 8,
+  "spent_usd": 0.176471775,
+  "train_rows": 2400,
+  "holdout_rows": 600,
+  "nondeterminism_band": 0.0,
+  "accepted": 0,
+  "proposed": 8
+}
+{
+  "stopped_because": "no improvement for 8 rounds",
+  "rounds": 9,
+  "root_score": 0.5370833333333334,
+  "holdout": {
+    "best": {
+      "accuracy": 0.5483333333333333,
+      "output_tokens": 9.413333333333334,
+      "prompt_tokens": 597.275,
+      "template_tokens": 428.0
+    },
+    "root": {
+      "accuracy": 0.5483333333333333,
+      "output_tokens": 9.413333333333334,
+      "prompt_tokens": 597.275,
+      "template_tokens": 428.0
+    },
+    "best_score": 0.5483333333333333,
+    "root_score": 0.5483333333333333,
+    "se": {
+      "accuracy": 0.02033377121690212,
+      "output_tokens": 0.06758191989626476,
+      "prompt_tokens": 1.2553631468604094,
+      "template_tokens": 0.0
+    }
+  },
+  "spent_usd": 0.176471775
+}
+
+--- best prompt ---
+You are qualifying inbound leads for Tallyforge, a revenue forecasting and pipeline analytics platform that
+connects to a company's CRM and data warehouse. Read the lead and decide what happens to it next.
+
+LEAD
+Source: {source}
+Created: {created_at}
+Name / title: {first_name}, {title}
+Company: {company} ({email_domain})
+Industry: {snap_industry}
+Employees: {snap_headcount}
+Funding: {snap_funding_stage}, {snap_months_since_funding} months since last round
+Tech stack: {snap_tech_stack}
+Hiring for sales/RevOps roles: {snap_hiring_signal}
+Existing customer: {is_existing_customer}
+Partner: {is_partner}
+Message: {message_text}
+
+HOW WE ROUTE
+1. existing_customer: they already pay us (Existing customer = True). Goes to their CSM, no matter what they wrote.
+2. partner_route: they work at one of our partners (Partner = True). Partners go to the channel team even when
+   they say they're bringing a client.
+3. rejected_fit: not our ICP. Our ICP is B2B companies with roughly 50 to 5,000 employees, ideally SaaS, fintech or
+   other tech, that run Salesforce or HubSpot. The person should work in RevOps, sales ops, sales leadership or
+   finance, at manager level or above. Students, job seekers, very small companies, government, education and
+   nonprofits are not a fit.
+4. rejected_no_intent: a good fit, but not in-market now. Content downloads and event badge scans are usually just
+   research unless the message describes an active project. No message at all counts as no intent.
+5. accepted: a good fit AND buying now: demo requests, referrals, a specific problem they want solved, a named
+   timeline or budget, evaluating or replacing another tool, a recent funding round or hiring in revenue roles.
+   Spam, sales pitches and nonsense are never accepted.
+
+Check the rules in order and use the first one that applies.
+
+Answer with exactly one of: accepted, rejected_fit, rejected_no_intent, existing_customer, partner_route
+

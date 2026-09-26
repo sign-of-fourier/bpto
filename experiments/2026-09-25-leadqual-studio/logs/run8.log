@@ -1,0 +1,89 @@
+run ea5ab38c06b8 -> runs/leadqual_studio/runs/ea5ab38c06b8
+example L28608 on node 6967db70e4 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26126 on node e15613ca5b failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28967 on node e15613ca5b failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28282 on node e15613ca5b failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27492 on node e15613ca5b failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27814 on node e15613ca5b failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26527 on node e15613ca5b failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26822 on node ce098271d3 failed: Extra data: line 2 column 1 (char 245)
+example L26180 on node fd338c5d65 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27114 on node fd338c5d65 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26547 on node fd338c5d65 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27115 on node fd338c5d65 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+{
+  "state": "done",
+  "error": null,
+  "round": 9,
+  "spent_usd": 0.5490406399999981,
+  "train_rows": 2400,
+  "holdout_rows": 600,
+  "nondeterminism_band": 0.0,
+  "accepted": 3,
+  "proposed": 9
+}
+{
+  "stopped_because": "no improvement for 8 rounds",
+  "rounds": 10,
+  "root_score": 0.6827140683459121,
+  "holdout": {
+    "best": {
+      "accuracy": 0.5583333333333333,
+      "accuracy_balanced": 0.739929829659373,
+      "output_tokens": 13.388333333333334,
+      "prompt_tokens": 694.275,
+      "template_tokens": 530.0
+    },
+    "root": {
+      "accuracy": 0.515,
+      "accuracy_balanced": 0.7036736420475216,
+      "output_tokens": 15.096666666666666,
+      "prompt_tokens": 597.275,
+      "template_tokens": 428.0
+    },
+    "best_score": 0.739929829659373,
+    "root_score": 0.7036736420475216,
+    "se": {
+      "accuracy": 0.02028993608205951,
+      "accuracy_balanced": 0.04564984523642543,
+      "output_tokens": 0.16467804995586333,
+      "prompt_tokens": 1.2553631468604094,
+      "template_tokens": 0.0
+    }
+  },
+  "spent_usd": 0.5490406399999981
+}
+
+--- best prompt ---
+You are qualifying inbound leads for Tallyforge, a revenue forecasting and pipeline analytics platform that connects to a company's CRM and data warehouse. Read the lead and decide what happens to it next.
+
+LEAD
+Source: {source}
+Created: {created_at}
+Name / title: {first_name}, {title}
+Company: {company} ({email_domain})
+Industry: {snap_industry}
+Employees: {snap_headcount}
+Funding: {snap_funding_stage}, {snap_months_since_funding} months since last round
+Tech stack: {snap_tech_stack}
+Hiring for sales/RevOps roles: {snap_hiring_signal}
+Existing customer: {is_existing_customer}
+Partner: {is_partner}
+Message: {message_text}
+
+HOW WE ROUTE
+1. existing_customer: they already pay us (Existing customer = True). Goes to their CSM, no matter what they wrote.
+2. partner_route: they work at one of our partners (Partner = True). Partners go to the channel team even when they say they're bringing a client.
+3. rejected_fit: not our ICP. Our ICP is B2B companies with roughly 50 to 5,000 employees, ideally SaaS, fintech or other tech, that run Salesforce or HubSpot. The person should work in RevOps, sales ops, sales leadership or finance, at manager level or above. Students, job seekers, very small companies, government, education and nonprofits are not a fit.
+4. rejected_no_intent: a good fit, but not in-market now. Content downloads and event badge scans are usually just research unless the message describes an active project. No message at all counts as no intent.
+5. accepted: a good fit AND buying now: demo requests, referrals, a specific problem they want solved, a named timeline or budget, evaluating or replacing another tool, a recent funding round or hiring in revenue roles. Spam, sales pitches and nonsense are never accepted.
+
+Check the rules in order and use the first one that applies.
+
+STRATEGY
+1. First, check if the lead is an existing customer or a partner. If so, route accordingly.
+2. If not, check if the lead fits our ICP based on industry, employee count, tech stack, and job title. If not, route as 'rejected_fit'.
+3. If the lead fits our ICP, check if there is any intent signal in the message or the lead source. If not, route as'rejected_no_intent'.
+4. If there is an intent signal, route as 'accepted'.
+
+Answer with exactly one of: accepted, rejected_fit, rejected_no_intent, existing_customer, partner_route

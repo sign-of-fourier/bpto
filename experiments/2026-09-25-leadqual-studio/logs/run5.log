@@ -1,0 +1,95 @@
+run 53f44c8428d1 -> runs/leadqual_studio/runs/53f44c8428d1
+example L28462 on node 4ee4d3c858 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28233 on node 4ee4d3c858 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27022 on node ac9d4a190d failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26907 on node ac9d4a190d failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27217 on node ac9d4a190d failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28217 on node ac9d4a190d failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26213 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26556 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27257 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26537 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28612 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27359 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28535 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26100 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26940 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28734 on node c2da8a88d8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28814 on node c2da8a88d8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L26786 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27970 on node 12d12737e8 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+{
+  "state": "done",
+  "error": null,
+  "round": 9,
+  "spent_usd": 0.5753344599999972,
+  "train_rows": 2400,
+  "holdout_rows": 600,
+  "nondeterminism_band": 0.0,
+  "accepted": 4,
+  "proposed": 9
+}
+{
+  "stopped_because": "no improvement for 8 rounds",
+  "rounds": 10,
+  "root_score": 0.5308333333333334,
+  "holdout": {
+    "best": {
+      "accuracy": 0.575,
+      "output_tokens": 16.753333333333334,
+      "prompt_tokens": 617.24,
+      "template_tokens": 447.50333333333333
+    },
+    "root": {
+      "accuracy": 0.515,
+      "output_tokens": 15.096666666666666,
+      "prompt_tokens": 597.275,
+      "template_tokens": 428.0
+    },
+    "best_score": 0.575,
+    "root_score": 0.515,
+    "se": {
+      "accuracy": 0.020186286154024936,
+      "output_tokens": 0.0931828704416328,
+      "prompt_tokens": 1.2563591552180458,
+      "template_tokens": 0.0
+    }
+  },
+  "spent_usd": 0.5753344599999972
+}
+
+--- best prompt ---
+You are qualifying inbound leads for Tallyforge, a revenue forecasting and pipeline analytics platform that
+connects to a company's CRM and data warehouse. Read the lead and decide what happens to it next.
+
+LEAD
+Source: {source}
+Created: {created_at}
+Name / title: {first_name}, {title}
+Company: {company} ({email_domain})
+Industry: {snap_industry}
+Employees: {snap_headcount}
+Funding: {snap_funding_stage}, {snap_months_since_funding} months since last round
+Tech stack: {snap_tech_stack}
+Hiring for sales/RevOps roles: {snap_hiring_signal}
+Existing customer: {is_existing_customer}
+Partner: {is_partner}
+Message: {message_text}
+
+HOW WE ROUTE
+1. existing_customer: they already pay us (Existing customer = True). Goes to their CSM, no matter what they wrote.
+2. partner_route: they work at one of our partners (Partner = True). Partners go to the channel team even when
+   they say they're bringing a client.
+3. rejected_fit: not our ICP. Our ICP is B2B companies with roughly 50 to 5,000 employees, ideally SaaS, fintech or
+   other tech, that run Salesforce or HubSpot. The person should work in RevOps, sales ops, sales leadership or
+   finance, at manager level or above. Students, job seekers, very small companies (less than 50 employees), government, education and
+   nonprofits are not a fit. Excludes: E-commerce, Retail, Government, Higher Education.
+4. rejected_no_intent: a good fit, but not in-market now. Content downloads and event badge scans are usually just
+   research unless the message describes an active project. No message at all counts as no intent.
+5. accepted: a good fit AND buying now: demo requests, referrals, a specific problem they want solved, a named
+   timeline or budget, evaluating or replacing another tool, a recent funding round or hiring in revenue roles.
+   Spam, sales pitches and nonsense are never accepted.
+
+Check the rules in order and use the first one that applies.
+
+Answer with exactly one of: accepted, rejected_fit, rejected_no_intent, existing_customer, partner_route
