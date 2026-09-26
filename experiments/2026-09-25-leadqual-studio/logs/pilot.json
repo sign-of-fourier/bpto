@@ -1,0 +1,254 @@
+{
+  "pilot": {
+    "rows": 12,
+    "baseline": 0.3333333333333333,
+    "baseline_rerun": 0.3333333333333333,
+    "nondeterminism_band": 0.0,
+    "rows_changed_on_rerun": 0,
+    "metrics": {
+      "accuracy": 0.3333333333333333,
+      "output_tokens": 9.166666666666666,
+      "prompt_tokens": 578.5,
+      "template_tokens": 428.0
+    },
+    "metrics_std": {
+      "accuracy": 0.49236596391733095,
+      "output_tokens": 1.3371158468430429,
+      "prompt_tokens": 18.402074981815602,
+      "template_tokens": 0.0
+    },
+    "sampling_se": {
+      "accuracy": 0.1421338109037403,
+      "output_tokens": 0.38599209705627263,
+      "prompt_tokens": 5.312221472199458,
+      "template_tokens": 0.0
+    },
+    "tokens_per_module": {},
+    "avg_input_tokens": 578.5,
+    "avg_output_tokens": 9.166666666666666,
+    "examples": [
+      {
+        "id": "L28639",
+        "output": "{\"disposition\":\"rejected_fit\"}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "rejected_no_intent",
+        "metrics": {
+          "accuracy": 0.0,
+          "prompt_tokens": 565.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L26247",
+        "output": "{\"disposition\":\"rejected_fit\"}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "rejected_no_intent",
+        "metrics": {
+          "accuracy": 0.0,
+          "prompt_tokens": 585.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L28120",
+        "output": "{\n  \"disposition\": \"rejected_fit\"\n}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "rejected_no_intent",
+        "metrics": {
+          "accuracy": 0.0,
+          "prompt_tokens": 593.0,
+          "output_tokens": 13.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L26824",
+        "output": "{\"disposition\":\"existing_customer\"}",
+        "parsed": {
+          "disposition": "existing_customer"
+        },
+        "answer": "existing_customer",
+        "metrics": {
+          "accuracy": 1.0,
+          "prompt_tokens": 602.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L28013",
+        "output": "{\"disposition\":\"rejected_fit\"}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "rejected_no_intent",
+        "metrics": {
+          "accuracy": 0.0,
+          "prompt_tokens": 577.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L26712",
+        "output": "{\"disposition\":\"rejected_fit\"}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "rejected_no_intent",
+        "metrics": {
+          "accuracy": 0.0,
+          "prompt_tokens": 584.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L27871",
+        "output": "{\"disposition\":\"rejected_fit\"}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "rejected_no_intent",
+        "metrics": {
+          "accuracy": 0.0,
+          "prompt_tokens": 603.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L26561",
+        "output": "{\"disposition\":\"rejected_fit\"}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "rejected_no_intent",
+        "metrics": {
+          "accuracy": 0.0,
+          "prompt_tokens": 567.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L26594",
+        "output": "{\"disposition\":\"accepted\"}",
+        "parsed": {
+          "disposition": "accepted"
+        },
+        "answer": "accepted",
+        "metrics": {
+          "accuracy": 1.0,
+          "prompt_tokens": 589.0,
+          "output_tokens": 7.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L27553",
+        "output": "{\"disposition\":\"rejected_fit\"}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "rejected_fit",
+        "metrics": {
+          "accuracy": 1.0,
+          "prompt_tokens": 543.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L27290",
+        "output": "{\"disposition\":\"rejected_fit\"}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "rejected_fit",
+        "metrics": {
+          "accuracy": 1.0,
+          "prompt_tokens": 554.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      },
+      {
+        "id": "L27654",
+        "output": "{\"disposition\":\"rejected_fit\"}",
+        "parsed": {
+          "disposition": "rejected_fit"
+        },
+        "answer": "accepted",
+        "metrics": {
+          "accuracy": 0.0,
+          "prompt_tokens": 580.0,
+          "output_tokens": 9.0,
+          "template_tokens": 428.0
+        },
+        "error": null,
+        "path": []
+      }
+    ],
+    "calls": 25
+  },
+  "cost": {
+    "calls": {
+      "round0": 2400.0,
+      "gate": 60.0,
+      "full": 8640.0,
+      "reflect": 12,
+      "critic": 60
+    },
+    "calls_worst_case": {
+      "round0": 2400.0,
+      "gate": 60.0,
+      "full": 8640.0,
+      "reflect": 12,
+      "critic": 60
+    },
+    "usd": {
+      "eval": 0.23899225000000002,
+      "reflect": 0.004464,
+      "critic": 0.00828,
+      "total": 0.25173625
+    },
+    "assumptions": {
+      "avg_steps": 1.0,
+      "acceptance": 0.3,
+      "full_rows": 2400,
+      "rounds": 12,
+      "unpriced_models": []
+    }
+  }
+}

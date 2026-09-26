@@ -1,0 +1,88 @@
+run 7da99b05d90e -> runs/leadqual_studio/runs/7da99b05d90e
+example L28608 on node e2f502b639 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28821 on node e2f502b639 failed: Unterminated string starting at: line 1 column 261 (char 260)
+example L28653 on node e2f502b639 failed: An error occurred (ResourceNotFoundException) when calling the Converse operation: Inference Profile ARN not found
+example L28462 on node e2f502b639 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28233 on node e2f502b639 failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L28526 on node 3642172dac failed: 1 validation error for Out_qualify
+disposition
+  Field required [type=missing, input_value={'properties': {'disposit...lify', 'type': 'object'}, input_type=dict]
+    For further information visit https://errors.pydantic.dev/2.13/v/missing
+example L28375 on node 3642172dac failed: Expecting property name enclosed in double quotes: line 12 column 30 (char 247)
+example L27633 on node e2f502b639 failed: An error occurred (ResourceNotFoundException) when calling the Converse operation: Inference Profile ARN not found
+{
+  "state": "done",
+  "error": null,
+  "round": 11,
+  "spent_usd": 0.37942985999999956,
+  "train_rows": 2400,
+  "holdout_rows": 600,
+  "nondeterminism_band": 0.0,
+  "accepted": 1,
+  "proposed": 11
+}
+{
+  "stopped_because": "no improvement for 8 rounds",
+  "rounds": 12,
+  "root_score": 0.5304166666666666,
+  "holdout": {
+    "best": {
+      "accuracy": 0.5133333333333334,
+      "output_tokens": 15.075,
+      "prompt_tokens": 596.195,
+      "template_tokens": 427.2866666666667
+    },
+    "root": {
+      "accuracy": 0.515,
+      "output_tokens": 15.096666666666666,
+      "prompt_tokens": 597.275,
+      "template_tokens": 428.0
+    },
+    "best_score": 0.5133333333333334,
+    "root_score": 0.515,
+    "se": {
+      "accuracy": 0.020421245406341937,
+      "output_tokens": 0.19375700788063943,
+      "prompt_tokens": 1.2535504803111117,
+      "template_tokens": 0.0
+    }
+  },
+  "spent_usd": 0.37942985999999956
+}
+
+--- best prompt ---
+You are qualifying inbound leads for Tallyforge, a revenue forecasting and pipeline analytics platform that
+connects to a company's CRM and data warehouse. Read the lead and decide what happens to it next.
+
+LEAD
+Source: {source}
+Created: {created_at}
+Name / title: {first_name}, {title}
+Company: {company} ({email_domain})
+Industry: {snap_industry}
+Employees: {snap_headcount}
+Funding: {snap_funding_stage}, {snap_months_since_funding} months since last round
+Tech stack: {snap_tech_stack}
+Hiring for sales/RevOps roles: {snap_hiring_signal}
+Existing customer: {is_existing_customer}
+Partner: {is_partner}
+Message: {message_text}
+
+HOW WE ROUTE
+1. existing_customer: they already pay us (Existing customer = True). Goes to their CSM, no matter what they wrote.
+2. partner_route: they work at one of our partners (Partner = True). Partners go to the channel team even when
+   they say they're bringing a client.
+3. rejected_fit: not our ICP. Our ICP is B2B companies with roughly 50 to 5,000 employees, ideally SaaS, fintech or
+   other tech, that run Salesforce or HubSpot. The person should work in RevOps, sales ops, sales leadership or
+   finance, at manager level or above. Students, job seekers, very small companies, government, education and
+   nonprofits are not a fit.
+4. rejected_no_intent: a good fit, but not in-market now. Content downloads and event badge scans are usually just
+   research unless the message describes an active project. No message at all counts as no intent.
+5. accepted: a good fit AND buying now: demo requests, referrals, a specific problem they want solved, a named
+   timeline or budget, evaluating or replacing another tool, a recent funding round or hiring in revenue roles.
+   Spam, sales pitches and nonsense are never accepted.
+
+Check the rules in order and use the first one that applies.
+
+Answer with exactly one of: accepted, rejected_fit, rejected_no_intent, existing_customer, partner_route
+
