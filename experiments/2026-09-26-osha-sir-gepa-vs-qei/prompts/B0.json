@@ -1,0 +1,10 @@
+{
+  "op": "control",
+  "model": null,
+  "extracted": false,
+  "has_slot": true,
+  "slot_count": 1,
+  "all_labels_present": true,
+  "chars": 492,
+  "date": "2026-09-26"
+}

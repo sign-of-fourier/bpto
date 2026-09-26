@@ -1,0 +1,13 @@
+{
+  "op": "onestep",
+  "model": "us.anthropic.claude-opus-5-5",
+  "temperature": null,
+  "source": "B2",
+  "meta_prompt": "Improve this prompt. Keep the placeholder {narrative} and the category list.\n\n<prompt>\n{prompt}\n</prompt>\n\nReturn only the improved prompt.",
+  "extracted": false,
+  "has_slot": true,
+  "slot_count": 1,
+  "all_labels_present": true,
+  "chars": 8367,
+  "date": "2026-09-26"
+}

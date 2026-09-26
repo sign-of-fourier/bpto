@@ -1,0 +1,57 @@
+You are an expert occupational safety analyst tasked with classifying OSHA Severe Injury Report narratives using the BLS Occupational Injury and Illness Classification System (OIICS) event or exposure definitions. Carefully read the narrative and determine the event category from the list provided below.
+
+**CATEGORIES AND DEFINITIONS**
+
+1. **Caught in or compressed by equipment or objects**
+   - Injury from a body part being squeezed, pinched, crushed, or pulled into equipment or objects. Examples: hand caught in machinery, body part pinched between moving parts, being crushed by collapsing materials.
+
+2. **Falls to lower level**
+   - Worker falls from an elevation to a lower surface. Examples: falls from ladders, roofs, scaffolds, vehicles, equipment, or stairs.
+
+3. **Struck by object or equipment**
+   - Worker struck by a moving object or piece of equipment. Examples: falling objects, flying debris, swinging objects, kickback from tools, loads from cranes.
+
+4. **Falls on same level**
+   - Worker slips, trips, or falls on the same walking or working surface. Examples: slipping on ice, water, grease; tripping over an object; falling on the ground.
+
+5. **Nonroadway incidents involving motorized land vehicles**
+   - Worker involved in incidents with motorized vehicles or mobile equipment off public roadways. Examples: vehicle overturns, collisions, ejections from vehicles, being pinned under an overturned vehicle.
+
+6. **Exposure to temperature extremes**
+   - Examples: heat stroke, frostbite, thermal burns from hot objects or liquids, contact with extremely cold objects. Burns from fire and chemical burns are excluded.
+
+7. **Pedestrian vehicular incident**
+   - Worker, not in or on a vehicle, is struck by a vehicle or mobile equipment. Examples: struck by a forklift, truck, or loader.
+
+8. **Struck against object or equipment**
+   - Worker's movement brings them into forceful contact with a stationary or moving object. Examples: bumping the head on a beam, walking into equipment, hitting a hand against a surface.
+
+9. **Exposure to electricity**
+   - Examples: electric shock, electrocution, arc flash, contact with energized lines or equipment, lightning strikes.
+
+10. **Exposure to other harmful substances**
+    - Contact with, inhalation of, ingestion of, or absorption of harmful substances. Examples: chemical burns, toxic gas inhalation, oxygen-deficient atmospheres, poisoning, allergic reactions, needlesticks.
+
+11. **Fires**
+    - Injury from a fire, flash fire, or ignition of clothing, materials, vapors, or structures. Examples: burns from flames, smoke inhalation from a fire.
+
+12. **Overexertion involving outside sources**
+    - Physical effort directed at an outside object causing strain, sprain, hernia, torn muscle or tendon. Examples: lifting, pushing, pulling, carrying, turning, holding, wielding, or throwing objects, patients, or materials.
+
+13. **Other**
+    - Use only when none of the above fits. Examples: roadway motor vehicle crashes, explosions without fire, violence, assaults, animal bites, drowning, bodily reactions without an outside source, repetitive motion. Also use when the narrative is too vague to determine the event.
+
+**DECISION RULES**
+- Classify based on how the injury was produced, not the type of injury or body part.
+- If multiple events occurred in sequence, use these precedence rules:
+  - Vehicle incidents take precedence over subsequent falls or strikes.
+  - A fall takes precedence over striking an object or the ground during the fall.
+  - Fires take precedence over resulting burns or smoke inhalation.
+  - Choose the event that directly produced the most serious injury.
+- Distinguish between Struck by (object moved into worker) and Struck against (worker moved into object).
+
+**NARRATIVE**
+{narrative}
+
+**OUTPUT INSTRUCTIONS**
+Respond with only the category name, spelled exactly as it appears in the list above. Do not include the number, explanation, punctuation, quotation marks, or any other text.

@@ -1,0 +1,113 @@
+{
+  "source": "January2015toNovember2025.csv",
+  "seed": 20260926,
+  "floor_per_class": 8,
+  "labels": [
+    "Caught in or compressed by equipment or objects",
+    "Falls to lower level",
+    "Struck by object or equipment",
+    "Falls on same level",
+    "Nonroadway incidents involving motorized land vehicles",
+    "Exposure to temperature extremes",
+    "Pedestrian vehicular incident",
+    "Struck against object or equipment",
+    "Exposure to electricity",
+    "Exposure to other harmful substances",
+    "Fires",
+    "Overexertion involving outside sources",
+    "Other"
+  ],
+  "top_groups": {
+    "64": "Caught in or compressed by equipment or objects",
+    "43": "Falls to lower level",
+    "62": "Struck by object or equipment",
+    "42": "Falls on same level",
+    "27": "Nonroadway incidents involving motorized land vehicles",
+    "53": "Exposure to temperature extremes",
+    "24": "Pedestrian vehicular incident",
+    "63": "Struck against object or equipment",
+    "51": "Exposure to electricity",
+    "55": "Exposure to other harmful substances",
+    "31": "Fires",
+    "71": "Overexertion involving outside sources"
+  },
+  "filter": {
+    "rows_2015_2023_nonempty": 88250,
+    "rows_with_major_group": 85439,
+    "rows_after_dedup": 85389
+  },
+  "class_share_filtered": {
+    "Caught in or compressed by equipment or objects": 0.2513,
+    "Falls to lower level": 0.1757,
+    "Struck by object or equipment": 0.1711,
+    "Falls on same level": 0.1259,
+    "Nonroadway incidents involving motorized land vehicles": 0.0466,
+    "Exposure to temperature extremes": 0.045,
+    "Pedestrian vehicular incident": 0.0351,
+    "Struck against object or equipment": 0.0345,
+    "Exposure to electricity": 0.02,
+    "Exposure to other harmful substances": 0.0186,
+    "Fires": 0.0119,
+    "Overexertion involving outside sources": 0.0107,
+    "Other": 0.0536
+  },
+  "splits": {
+    "train": {
+      "rows": 200,
+      "sha256": "4ce40721cf118eea11c1bd7f4d06b51f290409ab3eec99952785d621f4865fbf",
+      "per_class": {
+        "Exposure to other harmful substances": 10,
+        "Exposure to electricity": 10,
+        "Falls to lower level": 25,
+        "Struck by object or equipment": 25,
+        "Fires": 9,
+        "Exposure to temperature extremes": 12,
+        "Falls on same level": 20,
+        "Nonroadway incidents involving motorized land vehicles": 13,
+        "Other": 13,
+        "Caught in or compressed by equipment or objects": 32,
+        "Struck against object or equipment": 11,
+        "Pedestrian vehicular incident": 11,
+        "Overexertion involving outside sources": 9
+      }
+    },
+    "val": {
+      "rows": 200,
+      "sha256": "7307cc8780a0cad4d9c1eb0812298ccba20de246fe3705f6375a01f67d300306",
+      "per_class": {
+        "Exposure to other harmful substances": 10,
+        "Falls to lower level": 25,
+        "Pedestrian vehicular incident": 11,
+        "Exposure to temperature extremes": 12,
+        "Other": 13,
+        "Struck by object or equipment": 25,
+        "Exposure to electricity": 10,
+        "Nonroadway incidents involving motorized land vehicles": 13,
+        "Caught in or compressed by equipment or objects": 32,
+        "Falls on same level": 20,
+        "Overexertion involving outside sources": 9,
+        "Fires": 9,
+        "Struck against object or equipment": 11
+      }
+    },
+    "holdout": {
+      "rows": 200,
+      "sha256": "cc92d228dc1605372cccf847d6ec2f4d17c73718b4271f1c0d74587e8333a0bf",
+      "per_class": {
+        "Falls on same level": 20,
+        "Falls to lower level": 25,
+        "Exposure to temperature extremes": 12,
+        "Overexertion involving outside sources": 9,
+        "Exposure to other harmful substances": 10,
+        "Caught in or compressed by equipment or objects": 32,
+        "Pedestrian vehicular incident": 11,
+        "Fires": 9,
+        "Nonroadway incidents involving motorized land vehicles": 13,
+        "Struck against object or equipment": 11,
+        "Other": 13,
+        "Struck by object or equipment": 25,
+        "Exposure to electricity": 10
+      }
+    }
+  }
+}

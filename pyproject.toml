@@ -8,6 +8,7 @@ dependencies = ["anthropic>=1.0", "pydantic>=2.0", "httpx", "numpy"]
 [project.optional-dependencies]
 dev = ["pytest", "pytest-asyncio"]
 qei = ["quantecarlo>=0.7.1"]   # bpto.bo.QuantecarloQEI: hosted joint q-EI over the local surrogate's posterior
+bench = ["gepa==0.1.4", "pandas"]   # tasks/osha_sir: the official GEPA engine as the comparison arm
 
 [build-system]
 requires = ["setuptools>=68"]

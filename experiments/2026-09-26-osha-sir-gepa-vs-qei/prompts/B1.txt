@@ -1,0 +1,19 @@
+Classify the OSHA severe injury narrative below by the event that directly caused the injury. Choose exactly one category from this list and output only its name, with no explanation:
+
+Caught in or compressed by equipment or objects
+Falls to lower level
+Struck by object or equipment
+Falls on same level
+Nonroadway incidents involving motorized land vehicles
+Exposure to temperature extremes
+Pedestrian vehicular incident
+Struck against object or equipment
+Exposure to electricity
+Exposure to other harmful substances
+Fires
+Overexertion involving outside sources
+Other
+
+Use “Struck by” when an object or equipment moves into the worker; use “Struck against” when the worker moves into a stationary object or equipment. Use “Caught in or compressed by” for pinching, crushing, or entanglement between or within objects or equipment. Classify a pedestrian hit by a vehicle as “Pedestrian vehicular incident”; classify other incidents involving motorized land vehicles away from public roadways as “Nonroadway incidents involving motorized land vehicles.” Use “Other” only when none of the listed categories fits. Base the choice on the described event, not the injury diagnosis.
+
+Narrative: {narrative}

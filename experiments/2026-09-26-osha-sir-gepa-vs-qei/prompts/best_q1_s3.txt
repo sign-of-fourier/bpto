@@ -1,0 +1,85 @@
+For the task of classifying OSHA Severe Injury Report narratives using the BLS Occupational Injury and Illness Classification System (OIICS) event or exposure definitions, please adhere to the following updated instructions:
+
+**Inputs Format:**
+- The input consists of a narrative describing an incident involving an employee, detailing how the injury occurred.
+
+**Task Description:**
+You are to classify the incident described in the narrative into one of the specified event categories using the OIICS definitions. Your classification should be based on the primary mechanism of injury as described in the narrative.
+
+**Classification Categories and Definitions:**
+
+1. **Caught in or compressed by equipment or objects**
+   - The injury results from a body part being squeezed, pinched, crushed, or pulled into equipment or objects.
+
+2. **Falls to lower level**
+   - The worker falls from an elevation to a lower surface.
+
+3. **Struck by object or equipment**
+   - A moving object or piece of equipment strikes the worker.
+
+4. **Falls on same level**
+   - The worker slips, trips, or falls onto the same walking or working surface.
+
+5. **Nonroadway incidents involving motorized land vehicles**
+   - The worker is involved in an incident with a motorized vehicle or mobile equipment operating off public roadways.
+
+6. **Exposure to temperature extremes**
+   - Examples include heat stroke, hypothermia, and thermal burns.
+
+7. **Pedestrian vehicular incident**
+   - A worker is struck by a vehicle while on foot, not operating or riding it.
+
+8. **Struck against object or equipment**
+   - The worker's own movement brings them into forceful contact with a stationary or moving object.
+
+9. **Exposure to electricity**
+   - Examples include electric shock, electrocution, and contact with energized lines.
+
+10. **Exposure to other harmful substances**
+    - Contact with, inhalation of, ingestion of, or absorption of chemicals or other harmful substances.
+
+11. **Fires**
+    - The injury results from a fire, flash fire, or ignition of clothing, materials, vapors, or structures.
+
+12. **Overexertion involving outside sources**
+    - Physical effort directed at an outside object produces a strain, sprain, hernia, or other exertion injury.
+
+13. **Other**
+    - This category is for incidents that do not fit any of the above categories, such as roadway motor vehicle crashes, explosions without a fire, violence, or animal bites.
+
+**Decision Rules:**
+- Classify based on how the injury was produced, not the type of injury or body part.
+- If multiple events occurred, follow the precedence rules:
+  - Vehicle incidents take precedence over subsequent falls or strikes.
+  - A fall takes precedence over striking an object or the ground during the fall.
+  - Fires take precedence over resulting burns or smoke inhalation.
+  - Choose the event that directly produced the most serious injury.
+- Use these distinctions:
+  - If the object moved into the worker, choose **Struck by**.
+  - If the worker moved into the object, choose **Struck against**.
+  - If a body part was squeezed or crushed between objects or pulled into machinery, choose **Caught in or compressed by**.
+
+**Domain Specific Factual Information:**
+- In cases where a vehicle incident is involved (motorized land vehicles operating off public roadways), the context is critical. If a vehicle incident occurs off public roadways, it is classified under **"Nonroadway incidents involving motorized land vehicles"** rather than **"Pedestrian vehicular incident"** even if the worker is struck by the vehicle.
+- When assessing incidents involving exposure to electricity, consider not just direct contact but also the proximity and potential for arc flash or other electrical incidents.
+- For injuries involving **"Struck by object or equipment"** or **"Struck against object or equipment"**, the distinction should be made on whether the object was in motion or stationary.
+- Incidents involving amputations or severe injuries due to equipment must be carefully assessed to distinguish between being caught in machinery or being struck against a stationary object.
+- When an employee is pushed by another individual or object causing a fall, classify it under **"Other"** unless it specifically results from slipping or tripping, which would be **"Falls on same level"**.
+
+**Special Cases:**
+- If a firework unexpectedly goes off in an employee's hand, causing injuries, classify it under **"Other"**.
+- When an arc flash occurs in an electrical closet and causes burns, classify it under **"Exposure to electricity"** rather than **"Exposure to temperature extremes"**.
+
+**Examples and Clarifications:**
+- **Example 1:** An employee was scanning a cotton bale when a forklift hit his right ankle. (Struck by object or equipment)
+- **Example 2:** An employee's hand got caught between a rolling machine and a guide roll causing a fracture. (Caught in or compressed by equipment or objects)
+- **Example 3:** An employee's fingertip was caught between the material and the die in a brake press, resulting in amputation. (Caught in or compressed by equipment or objects)
+- **Example 4:** An employee lost his balance while trying to stop a panel from falling and fell, hitting part of the engine and then the ground. (Falls to lower level)
+- **Example 5:** An employee's finger was severed by a saw while cutting meat. (Struck against object or equipment)
+- **Example 6:** An employee suffered second-degree burns from a release of steam while working. (Exposure to temperature extremes)
+- **Example 7:** An employee was repairing a meter when its glass cover shattered and lacerated his wrist. (Struck by object or equipment)
+- **Example 8:** An employee started to pour an electric arc furnace when an explosion caused molten metal to be ejected, striking the employee. (Other)
+- **Example 9:** An employee exhibited signs of heat exhaustion during a training session. (Exposure to temperature extremes)
+
+**Output:**
+Respond with only the category name, spelled exactly as it appears in the list above. Do not include the number, explanation, punctuation, or any other text.
