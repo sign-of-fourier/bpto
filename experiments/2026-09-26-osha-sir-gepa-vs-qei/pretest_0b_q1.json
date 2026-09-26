@@ -1,0 +1,54 @@
+{
+  "arm": "q1",
+  "seed": 0,
+  "B": 600,
+  "val_n": 50,
+  "minibatch": 10,
+  "secs": 182.7,
+  "spent_usd": 0.0311,
+  "task_calls_billed": 580,
+  "task_cache_hits": 20,
+  "task_tokens": [
+    663416,
+    3722
+  ],
+  "reflect_calls": 20,
+  "embed_calls": 0,
+  "error": null,
+  "total_metric_calls": 600,
+  "candidates": 4,
+  "val_scores": [
+    0.86,
+    0.84,
+    0.82,
+    0.76
+  ],
+  "best_idx": 0,
+  "best_val": 0.86,
+  "seed_val": 0.86,
+  "discovery_calls": [
+    0,
+    110,
+    380,
+    450
+  ],
+  "parents": [
+    [
+      null
+    ],
+    [
+      0
+    ],
+    [
+      0
+    ],
+    [
+      0
+    ]
+  ],
+  "rows_requested": 600,
+  "rows_errors": 0,
+  "evals_slot_restored": 2,
+  "stalled": false,
+  "reflection_failures": 0
+}

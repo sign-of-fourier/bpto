@@ -1,0 +1,3 @@
+Classify this injury narrative into one of: Caught in or compressed by equipment or objects; Falls to lower level; Struck by object or equipment; Falls on same level; Nonroadway incidents involving motorized land vehicles; Exposure to temperature extremes; Pedestrian vehicular incident; Struck against object or equipment; Exposure to electricity; Exposure to other harmful substances; Fires; Overexertion involving outside sources; Other. Answer with the label only.
+
+Narrative: {narrative}

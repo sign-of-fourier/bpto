@@ -1,0 +1,13 @@
+{
+  "op": "onestep",
+  "model": "us.amazon.nova-lite-v1:0",
+  "temperature": 1.0,
+  "source": "B2",
+  "meta_prompt": "Improve this prompt. Keep the placeholder {narrative} and the category list.\n\n<prompt>\n{prompt}\n</prompt>\n\nReturn only the improved prompt.",
+  "extracted": true,
+  "has_slot": true,
+  "slot_count": 1,
+  "all_labels_present": true,
+  "chars": 3996,
+  "date": "2026-09-26"
+}

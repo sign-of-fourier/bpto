@@ -1,0 +1,75 @@
+For this task, the goal is to classify OSHA Severe Injury Report narratives accurately into one of the specified event categories using the BLS Occupational Injury and Illness Classification System (OIICS) event or exposure definitions. The instructions below detail the necessary steps, considerations, and rules for this classification process, including domain-specific facts and strategies that the assistant should use to improve accuracy.
+
+INSTRUCTIONS
+
+CATEGORIES AND DEFINITIONS
+
+1. **Caught in or compressed by equipment or objects**
+   - The injury results from a body part being squeezed, pinched, crushed, or pulled into equipment or objects. This includes being trapped between objects or pulled into machinery.
+
+2. **Falls to lower level**
+   - The worker falls from an elevation to a lower surface, such as falls from ladders, roofs, scaffolds, or vehicles.
+
+3. **Struck by object or equipment**
+   - A moving object or piece of equipment strikes the worker. This includes falling objects, flying debris, kickback from tools, or a load dropping from a crane.
+
+4. **Falls on same level**
+   - The worker slips, trips, or falls onto the same walking or working surface, such as slipping on ice, tripping over an object, or falling while walking or standing on the ground.
+
+5. **Nonroadway incidents involving motorized land vehicles**
+   - The worker is an operator or passenger of a motorized vehicle or mobile equipment operating off public roadways, such as forklift overturns or collisions between such vehicles.
+
+6. **Exposure to temperature extremes**
+   - Examples include heat stroke, hypothermia, thermal burns from hot objects, or contact with extremely cold objects or substances.
+
+7. **Pedestrian vehicular incident**
+   - A worker who is not in or on a vehicle, such as someone walking, standing, or working on foot, is struck by a vehicle or mobile equipment.
+
+8. **Struck against object or equipment**
+   - The worker's own movement brings them into forceful contact with a stationary or moving object, such as bumping the head on a beam or hitting a hand against a surface.
+
+9. **Exposure to electricity**
+   - Examples include electric shock, electrocution, arc flash, contact with energized lines or equipment, and lightning strikes.
+
+10. **Exposure to other harmful substances**
+    - Contact with, inhalation of, ingestion of, or absorption of chemicals or other harmful substances, such as chemical burns, toxic gas inhalation, or allergic reactions.
+
+11. **Fires**
+    - The injury results from a fire, flash fire, or ignition of clothing, materials, vapors, or structures, such as burns from flames or smoke inhalation.
+
+12. **Overexertion involving outside sources**
+    - Physical effort directed at an outside object, such as lifting, pushing, pulling, or carrying objects, patients, or materials that produces a strain, sprain, or other exertion injury.
+
+13. **Other**
+    - Use this category only when none of the above fits, such as roadway motor vehicle crashes, explosions without a fire, violence or assaults, animal bites, drowning, bodily reactions without an outside source, or repetitive motion. Also use it when the narrative is too vague to determine the event.
+
+DECISION RULES
+
+- Classify based on how the injury was produced, not the type of injury or body part. For example, an amputation could be classified as "Caught in or compressed by equipment or objects" if it resulted from the worker's body part being trapped in machinery.
+  
+- If multiple events occurred in sequence, use these precedence rules:
+  - Vehicle incidents (Nonroadway or Pedestrian vehicular incidents) take precedence over subsequent falls or strikes.
+  - A fall takes precedence over striking an object or the ground during the fall.
+  - Fires take precedence over resulting burns or smoke inhalation.
+  - Otherwise, choose the event that directly produced the most serious injury.
+
+- Use these distinctions:
+  - If the object moved into the worker, choose "Struck by."
+  - If the worker moved into the object, choose "Struck against."
+  - If a body part was squeezed or crushed between objects or pulled into machinery, choose "Caught in or compressed by."
+
+- If the worker was struck by a vehicle while on foot, choose "Pedestrian vehicular incident." If the worker was operating or riding a vehicle off-road, choose "Nonroadway incidents involving motorized land vehicles."
+
+- A fall from any elevation, including stairs, steps, and vehicles, is "Falls to lower level." A slip or trip on a level surface is "Falls on same level."
+
+ADDITIONAL NOTES
+- When distinguishing between "Struck by object or equipment" and "Struck against object or equipment," consider whether the object was moving towards the worker or if the worker collided with the stationary object.
+- When considering "Fires," always prioritize the fire event over secondary injuries like burns or smoke inhalation that resulted from it.
+- Remember the context: for example, if a machine starts unexpectedly and injures a worker, it could be either "Struck by" or "Struck against," depending on the direction of the motion.
+
+INPUTS
+- You will receive a narrative describing an occupational injury incident.
+- The narrative will contain sufficient details to classify the event into one of the specified categories.
+
+OUTPUT INSTRUCTIONS
+- Respond with only the category name, spelled exactly as it appears in the list above. Do not include the number, explanation, punctuation, quotation marks, or any other text.

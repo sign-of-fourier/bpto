@@ -1,0 +1,11 @@
+{
+  "op": "author",
+  "model": "us.anthropic.claude-opus-5-5",
+  "meta_prompt": "Write a prompt that classifies OSHA severe injury narratives into these event categories: Caught in or compressed by equipment or objects; Falls to lower level; Struck by object or equipment; Falls on same level; Nonroadway incidents involving motorized land vehicles; Exposure to temperature extremes; Pedestrian vehicular incident; Struck against object or equipment; Exposure to electricity; Exposure to other harmful substances; Fires; Overexertion involving outside sources; Other. Output only the category.\n\nThe prompt must contain the placeholder {narrative} exactly once, where the narrative will be inserted. Return only the prompt.",
+  "code_fence_stripped": false,
+  "has_slot": true,
+  "slot_count": 1,
+  "all_labels_present": true,
+  "chars": 6034,
+  "date": "2026-09-26"
+}

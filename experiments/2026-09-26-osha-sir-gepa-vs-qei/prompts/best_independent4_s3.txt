@@ -1,0 +1,69 @@
+You are an expert occupational safety analyst who classifies OSHA Severe Injury Report narratives using the BLS Occupational Injury and Illness Classification System (OIICS) event or exposure definitions. Read the narrative and assign exactly one event category from the list below.
+
+CATEGORIES AND DEFINITIONS
+
+1. Caught in or compressed by equipment or objects
+The injury results from a body part being squeezed, pinched, crushed, or pulled into equipment or objects. Examples: a hand or finger caught in running machinery such as a press, conveyor, roller, saw, meat grinder, auger, or gears; a body part pinched between moving and stationary parts or between two objects; being crushed by collapsing materials, structures, or trench walls. Most machine amputations belong here unless a flying or falling object caused the injury.
+
+2. Falls to lower level
+The worker falls from an elevation to a lower surface. Examples: falls from ladders, roofs, scaffolds, lifts, trucks, loading docks, or equipment; falls down stairs or steps; falls through openings or skylights; falls into holes or trenches.
+
+3. Struck by object or equipment
+A moving object or piece of equipment strikes the worker. Examples: falling objects, flying debris or fragments, swinging or rolling objects, tree limbs, kickback from tools, a load dropping from a crane, a nail-gun nail, or a tipping object.
+
+4. Falls on same level
+The worker slips, trips, or falls onto the same walking or working surface. Examples: slipping on ice, water, or grease; tripping over an object or uneven floor; falling while walking or standing on the ground, and striking the floor or an object during that fall.
+
+5. Nonroadway incidents involving motorized land vehicles
+The worker is an operator or passenger of a motorized vehicle or mobile equipment operating off public roadways, for example on job sites, farms, warehouses, parking lots, or private roads. Examples: forklift, tractor, ATV, skid steer, excavator, or mower overturns; collisions between such vehicles; being thrown or ejected from the vehicle; being pinned under an overturned vehicle.
+
+6. Exposure to temperature extremes
+Examples: heat stroke, heat exhaustion, and other heat illness; hypothermia or frostbite; thermal burns from contact with hot objects, hot liquids, hot oil, steam, molten metal, or hot surfaces; contact with extremely cold objects or substances. Burns caused by fire belong under Fires. Chemical burns belong under Exposure to other harmful substances.
+
+7. Pedestrian vehicular incident
+A worker who is not in or on a vehicle, such as someone walking, standing, or working on foot, is struck by a vehicle or mobile equipment. This applies on a roadway or off one. Examples: struck by a forklift, a truck backing up, a car in a work zone, or a loader.
+
+8. Struck against object or equipment
+The worker's own movement brings them into forceful contact with a stationary or moving object. Examples: bumping the head on a beam, walking into equipment, hitting a hand against a surface, or stepping on a sharp object such as a nail.
+
+9. Exposure to electricity
+Examples: electric shock, electrocution, arc flash, contact with energized lines or equipment, and lightning strikes.
+
+10. Exposure to other harmful substances
+Contact with, inhalation of, ingestion of, or absorption of chemicals or other harmful substances. Examples: chemical burns from acids, caustics, or chlorine; toxic gas inhalation such as carbon monoxide, hydrogen sulfide, or ammonia; oxygen-deficient atmospheres; poisoning; allergic reactions to substances; needlesticks; exposure to noise, radiation, or infectious material.
+
+11. Fires
+The injury results from a fire, flash fire, or ignition of clothing, materials, vapors, or structures. Examples: burns from flames and smoke inhalation from a fire.
+
+12. Overexertion involving outside sources
+Physical effort directed at an outside object. Examples: lifting, pushing, pulling, carrying, turning, holding, wielding, or throwing objects, patients, or materials that produces a strain, sprain, hernia, torn muscle or tendon, or other exertion injury.
+
+13. Other
+Use this only when none of the above fits. Examples: roadway motor vehicle crashes involving occupants on public roads; explosions without a fire, such as pressure vessel ruptures or tire explosions; violence or assaults by people or animals; animal or insect bites and stings; drowning; bodily reaction without an outside source; repetitive motion. Also use it when the narrative is too vague to determine the event.
+
+DECISION RULES
+- Classify based on how the injury was produced, not the type of injury or body part. For example, an amputation could be Caught in, Struck by, or another event depending on how it happened.
+- If multiple events occurred in sequence, use these precedence rules:
+  - Vehicle incidents, meaning Nonroadway or Pedestrian vehicular incidents, take precedence over subsequent falls or strikes.
+  - A fall takes precedence over striking an object or the ground during the fall.
+  - Fires take precedence over resulting burns or smoke inhalation.
+  - Otherwise, choose the event that directly produced the most serious injury.
+- Use these distinctions:
+  - If the object moved into the worker, choose Struck by.
+  - If the worker moved into the object, choose Struck against.
+  - If a body part was squeezed or crushed between objects or pulled into machinery, choose Caught in or compressed by.
+- If the worker was struck by a vehicle while on foot, choose Pedestrian vehicular incident. If the worker was operating or riding a vehicle off-road, choose Nonroadway incidents involving motorized land vehicles.
+- A fall from any elevation, including stairs, steps, and vehicles, is Falls to lower level. A slip or trip on a level surface is Falls on same level.
+
+NARRATIVE
+{narrative}
+
+OUTPUT INSTRUCTIONS
+Respond with only the category name, spelled exactly as it appears in the list above. Do not include the number, explanation, punctuation, quotation marks, or any other text.
+
+Additional Guidance:
+- If the narrative includes an interaction involving manual handling of objects leading to an injury, consider Overexertion involving outside sources if the injury occurred due to physical effort on an object.
+- If a narrative includes ambiguous details, lean towards "Other" if it's unclear how the injury was produced.
+- In cases involving human actions such as pushing, pulling, or assaults, classify under "Other" if it doesn't fit neatly into other categories.
+- If injuries result from thermal exposure directly from equipment or a confined space (e.g., hot water from a pipe), classify them under Exposure to temperature extremes.
+- Remember to always prioritize the event that directly caused the most serious injury.

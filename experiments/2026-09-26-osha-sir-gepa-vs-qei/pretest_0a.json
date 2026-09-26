@@ -1,0 +1,331 @@
+{
+  "checks": [
+    {
+      "check": "C1 completes and climbs",
+      "status": "PASS",
+      "detail": "val 0.1 -> 1.0, 21 candidates, 36 reflections"
+    },
+    {
+      "check": "C2 GEPA count == rows requested; billed == client",
+      "status": "PASS",
+      "detail": "GEPA 1500 = requested 1500; billed 1154 = client 1154 (346 cache hits)"
+    },
+    {
+      "check": "C3 overshoot",
+      "status": "NOTE",
+      "detail": "+0 calls past max_metric_calls=1500 (engine checks the budget only between iterations)"
+    },
+    {
+      "check": "C2b count=billed is a mixed unit",
+      "status": "NOTE",
+      "detail": "GEPA 1505 vs billed 1271: the engine takes num_metric_calls on minibatches but charges validation passes per row, cached or not"
+    },
+    {
+      "check": "C4a same seed -> same run",
+      "status": "PASS",
+      "detail": "candidates identical: True, calls 1500 vs 1500"
+    },
+    {
+      "check": "C4b resume from run_dir",
+      "status": "PASS",
+      "detail": "first leg 770 calls / 15 cands, resumed to 1500 / 25; uninterrupted 1500 / 21; same final candidates as uninterrupted: False"
+    },
+    {
+      "check": "C5 q=4 fans out",
+      "status": "PASS",
+      "detail": "max in flight 16 (q=1: 16), max rows per engine step 160 (q=1: 40), 0.39s vs 0.57s"
+    },
+    {
+      "check": "C6 transient errors",
+      "status": "PASS",
+      "detail": "45 failed rows scored 0, run continued"
+    },
+    {
+      "check": "C7 BudgetExceeded propagates",
+      "status": "PASS",
+      "detail": "BudgetExceeded: calls 500 >= 500; client billed 500 <= cap 500"
+    },
+    {
+      "check": "C8 dropped slot restored",
+      "status": "PASS",
+      "detail": "reflector dropped the slot 6x; 127 evaluations ran with it restored; reflector replies without ``` 4x (GEPA takes the whole reply as the instruction)"
+    },
+    {
+      "check": "C9a q-EI completes, counts match",
+      "status": "PASS",
+      "detail": "val 0.1 -> 0.45, 28 candidates, GEPA 1520 = requested 1520 (billed 1154)"
+    },
+    {
+      "check": "C9b always q proposals",
+      "status": "PASS",
+      "detail": "10 iterations: 2 warmup, 8 q-EI; 32 distinct parents over the q-EI iterations"
+    },
+    {
+      "check": "C9c surrogate is informative",
+      "status": "PASS",
+      "detail": "flat acquisition in 0/8 fits; joint pick differs from independent top-q in 5/8; last fit: n_train 36, inputs 12, pca {'dims': 4, 'explained': 0.9419013785338536}"
+    },
+    {
+      "check": "C9d q-EI same seed -> same run",
+      "status": "PASS",
+      "detail": "parents identical: True"
+    },
+    {
+      "check": "C10 mock race (plumbing only, not evidence)",
+      "status": "NOTE",
+      "detail": "q1: best val [1.0, 1.0, 0.975], reflections [36, 33, 33]; independent_q4: best val [0.625, 0.4, 0.325], reflections [35, 36, 34]; qei_q4: best val [0.45, 0.175, 0.6], reflections [33, 31, 30]"
+    }
+  ],
+  "runs": {
+    "base": {
+      "secs": 0.57,
+      "task_calls_billed_by_client": 1154,
+      "task_cache_hits": 346,
+      "reflect_calls": 36,
+      "max_inflight": 16,
+      "faults": {
+        "task_errors": 45,
+        "garbage": 4,
+        "dropped": 6
+      },
+      "total_metric_calls": 1500,
+      "candidates": 21,
+      "full_val_evals": 21,
+      "seed_val": 0.1,
+      "best_val": 1.0,
+      "rows_requested": 1500,
+      "rows_billed": 1154,
+      "rows_cached": 346,
+      "row_errors": 45,
+      "evals_slot_restored": 127,
+      "stalled": false,
+      "reflection_failures": 0,
+      "max_rows_per_engine_step": 40
+    },
+    "billed": {
+      "secs": 0.98,
+      "task_calls_billed_by_client": 1271,
+      "task_cache_hits": 1464,
+      "reflect_calls": 64,
+      "max_inflight": 16,
+      "faults": {
+        "task_errors": 101,
+        "garbage": 11,
+        "dropped": 10
+      },
+      "total_metric_calls": 1505,
+      "candidates": 28,
+      "full_val_evals": 28,
+      "seed_val": 0.1,
+      "best_val": 1.0,
+      "rows_requested": 2735,
+      "rows_billed": 1271,
+      "rows_cached": 1464,
+      "row_errors": 101,
+      "evals_slot_restored": 325,
+      "stalled": false,
+      "reflection_failures": 0,
+      "max_rows_per_engine_step": 40
+    },
+    "same_seed": {
+      "secs": 0.56,
+      "task_calls_billed_by_client": 1154,
+      "task_cache_hits": 346,
+      "reflect_calls": 36,
+      "max_inflight": 16,
+      "faults": {
+        "task_errors": 45,
+        "garbage": 4,
+        "dropped": 6
+      },
+      "total_metric_calls": 1500,
+      "candidates": 21,
+      "full_val_evals": 21,
+      "seed_val": 0.1,
+      "best_val": 1.0,
+      "rows_requested": 1500,
+      "rows_billed": 1154,
+      "rows_cached": 346,
+      "row_errors": 45,
+      "evals_slot_restored": 127,
+      "stalled": false,
+      "reflection_failures": 0,
+      "max_rows_per_engine_step": 40
+    },
+    "resume_first": {
+      "secs": 0.3,
+      "task_calls_billed_by_client": 767,
+      "task_cache_hits": 3,
+      "reflect_calls": 17,
+      "max_inflight": 16,
+      "faults": {
+        "task_errors": 16,
+        "garbage": 4,
+        "dropped": 2
+      },
+      "total_metric_calls": 770,
+      "candidates": 15,
+      "full_val_evals": 15,
+      "seed_val": 0.1,
+      "best_val": 0.7,
+      "rows_requested": 770,
+      "rows_billed": 767,
+      "rows_cached": 3,
+      "row_errors": 16,
+      "evals_slot_restored": 23,
+      "stalled": false,
+      "reflection_failures": 0,
+      "max_rows_per_engine_step": 40
+    },
+    "resume_second": {
+      "secs": 0.43,
+      "task_calls_billed_by_client": 502,
+      "task_cache_hits": 268,
+      "reflect_calls": 13,
+      "max_inflight": 16,
+      "faults": {
+        "task_errors": 15,
+        "garbage": 1,
+        "dropped": 3
+      },
+      "total_metric_calls": 1500,
+      "candidates": 25,
+      "full_val_evals": 25,
+      "seed_val": 0.1,
+      "best_val": 1.0,
+      "rows_requested": 770,
+      "rows_billed": 502,
+      "rows_cached": 268,
+      "row_errors": 15,
+      "evals_slot_restored": 76,
+      "stalled": false,
+      "reflection_failures": 0,
+      "max_rows_per_engine_step": 40
+    },
+    "independent_q4": {
+      "secs": 0.39,
+      "task_calls_billed_by_client": 1370,
+      "task_cache_hits": 270,
+      "reflect_calls": 35,
+      "max_inflight": 16,
+      "faults": {
+        "task_errors": 30,
+        "garbage": 3,
+        "dropped": 3
+      },
+      "total_metric_calls": 1640,
+      "candidates": 31,
+      "full_val_evals": 31,
+      "seed_val": 0.1,
+      "best_val": 0.625,
+      "rows_requested": 1640,
+      "rows_billed": 1370,
+      "rows_cached": 270,
+      "row_errors": 30,
+      "evals_slot_restored": 47,
+      "stalled": false,
+      "reflection_failures": 0,
+      "max_rows_per_engine_step": 160
+    },
+    "task_cap": {
+      "secs": 0.17,
+      "task_calls_billed_by_client": 500,
+      "task_cache_hits": 0,
+      "reflect_calls": 11,
+      "max_inflight": 16,
+      "faults": {
+        "task_errors": 9,
+        "garbage": 3,
+        "dropped": 1
+      },
+      "error": "BudgetExceeded: calls 500 >= 500"
+    },
+    "qei_q4": {
+      "secs": 0.42,
+      "task_calls_billed_by_client": 1154,
+      "task_cache_hits": 366,
+      "reflect_calls": 33,
+      "max_inflight": 16,
+      "faults": {
+        "task_errors": 36,
+        "garbage": 2,
+        "dropped": 5
+      },
+      "total_metric_calls": 1520,
+      "candidates": 28,
+      "full_val_evals": 28,
+      "seed_val": 0.1,
+      "best_val": 0.45,
+      "rows_requested": 1520,
+      "rows_billed": 1154,
+      "rows_cached": 366,
+      "row_errors": 36,
+      "evals_slot_restored": 44,
+      "stalled": false,
+      "reflection_failures": 0,
+      "max_rows_per_engine_step": 160
+    },
+    "mock_race": {
+      "q1": [
+        {
+          "best_val": 1.0,
+          "calls": 1500,
+          "secs": 0.56,
+          "iterations": 36
+        },
+        {
+          "best_val": 1.0,
+          "calls": 1500,
+          "secs": 0.61,
+          "iterations": 33
+        },
+        {
+          "best_val": 0.975,
+          "calls": 1525,
+          "secs": 0.62,
+          "iterations": 33
+        }
+      ],
+      "independent_q4": [
+        {
+          "best_val": 0.625,
+          "calls": 1640,
+          "secs": 0.39,
+          "iterations": 35
+        },
+        {
+          "best_val": 0.4,
+          "calls": 1560,
+          "secs": 0.41,
+          "iterations": 36
+        },
+        {
+          "best_val": 0.325,
+          "calls": 1640,
+          "secs": 0.4,
+          "iterations": 34
+        }
+      ],
+      "qei_q4": [
+        {
+          "best_val": 0.45,
+          "calls": 1520,
+          "secs": 0.41,
+          "iterations": 33
+        },
+        {
+          "best_val": 0.175,
+          "calls": 1600,
+          "secs": 0.42,
+          "iterations": 31
+        },
+        {
+          "best_val": 0.6,
+          "calls": 1515,
+          "secs": 0.43,
+          "iterations": 30
+        }
+      ]
+    }
+  }
+}
