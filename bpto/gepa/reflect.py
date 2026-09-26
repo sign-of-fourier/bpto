@@ -17,7 +17,13 @@ from ..tree import ExampleResult, Node, NodeState, Origin, Tree, trace_visits
 
 Feedback = Callable[[Example, ExampleResult], str]
 Passed = Callable[[Example, ExampleResult], bool]
+Context = Callable[[Tree, Node], str]
 
+# Additive by design: "add concrete rules ... do not merely rephrase" (2026-09-11) was the fix for a reflector that
+# only paraphrased (experiments/2026-09-11-ifbench-gepa-vs-bo). It grows prompts; it does not ask for existing rules to
+# be edited, narrowed, reordered or deleted, so a failure caused by an early first-match-wins rule tends to get an
+# appendix that never fires. Tasks that need edits or cuts pass their own `meta_prompt` (tasks/compression does).
+# Every committed gepa/bo result used this text verbatim: add alternatives beside it, do not change it.
 REFLECT_PROMPT = (
     "I gave an assistant the following prompt template to perform a task. The template is supposed to: "
     "{description}\nIt must keep these placeholders exactly, in curly braces: {placeholders}\n\n"
@@ -54,7 +60,8 @@ class ReflectiveExpander(LLMExpander):
     def __init__(self, feedback: Feedback | dict[str, Feedback] = default_feedback, minibatch: int = 3, n: int = 1,
                  calls: int = 1, seed: int | None = None, max_output_chars: int = 1500, meta_prompt: str | None = None,
                  config: ModelConfig | None = None, passed: Passed | dict[str, Passed] | None = None,
-                 module: str | None = None, max_input_chars: int = 4000, visits: int = 1):
+                 module: str | None = None, max_input_chars: int = 4000, visits: int = 1,
+                 context: Context | None = None):
         super().__init__(n=n, calls=calls, meta_prompt=meta_prompt or REFLECT_PROMPT, config=config, module=module)
         pick = lambda f: f[module] if isinstance(f, dict) else f
         self.feedback, self.minibatch, self.seed = pick(feedback), minibatch, seed
@@ -62,6 +69,9 @@ class ReflectiveExpander(LLMExpander):
         # which traces count as successes (failures are shown first); default: objective >= 1. May return an int
         # ordering key instead of a bool (0 first) when some failures are more informative than others.
         self.passed = pick(passed)
+        # optional text shown above the examples, from the source node's whole evaluation (e.g. a per-class confusion
+        # summary): the examples are a failure-first handful and never show the aggregate pattern
+        self.context = context
 
     def source(self, tree: Tree, node: Node) -> Node | None:
         """The node whose traces are used: itself if evaluated, else the nearest evaluated ancestor."""
@@ -109,11 +119,14 @@ class ReflectiveExpander(LLMExpander):
         return "\n".join(parts) if parts else "(no traces available)\n"
 
     def render_meta(self, tree: Tree, node: Node, seed: int) -> str:
-        _, rows = self.pick(tree, node)
+        src, rows = self.pick(tree, node)
         cur = self.target(node)
+        directive = self.render_examples(rows)
+        if self.context is not None and src is not None:
+            directive = self.context(tree, src).rstrip() + "\n\n" + directive
         return self.meta_prompt.format(
             n=self.n, prompt=cur.template, description=self.description(tree, node),
-            directive=self.render_examples(rows), placeholders=", ".join("{%s}" % p for p in cur.placeholders),
+            directive=directive, placeholders=", ".join("{%s}" % p for p in cur.placeholders),
             seed=f" (variation batch {seed})" if self.calls > 1 else "",
         )
 
@@ -121,6 +134,8 @@ class ReflectiveExpander(LLMExpander):
         p = super().params()
         p.pop("directive", None)
         p["minibatch"] = self.minibatch
+        if self.context is not None:
+            p["context"] = getattr(self.context, "__name__", type(self.context).__name__)
         return p
 
     async def run_one(self, tree: Tree, node: Node) -> list[Node]:
