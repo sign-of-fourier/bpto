@@ -6,6 +6,10 @@
 
 Score = the detailed code is exact (GEPA sees only this). Group accuracy is recorded beside it, from the same calls.
 Each row is up to two task-model calls; GEPA's metric unit stays one per row evaluated.
+
+Decoupled mode (`step=`): the candidate is one component, scored against its own labels, one call per row.
+`step="route"` runs step 1 alone and scores the group; `step="code"` hands step 2 the gold group and scores the code.
+The two best components are recombined afterwards (joint vs decoupled optimization of the same program).
 """
 from __future__ import annotations
 
@@ -98,8 +102,10 @@ class TwoStepAdapter:
     propose_new_texts = None  # GEPA's own reflector and reflection prompt
 
     def __init__(self, client: ModelClient, book: dict, bridge: Bridge | None, *, config: ModelConfig | None = None,
-                 oracle_group: bool = False):
-        self.client, self.bridge, self.config, self.oracle_group = client, bridge, config, oracle_group
+                 oracle_group: bool = False, step: str | None = None):
+        assert step in (None, *COMPONENTS)
+        self.client, self.bridge, self.config, self.step = client, bridge, config, step
+        self.oracle_group = oracle_group or step == "code"
         self.groups, self.codes = book["groups"], book["codes"]
         self.stats = Stats()
         self._batch_id = 0
@@ -124,7 +130,7 @@ class TwoStepAdapter:
                 t.route_out, hit = await self._call(t, "route", prompt)
                 fresh, cached = fresh + (not hit), cached + hit
                 t.group = parse_group(t.route_out, self.groups)
-            if t.group is None:
+            if t.group is None or self.step == "route":
                 return t, fresh, cached
             codes = self.codes[t.group]
             if len(codes) == 1:
@@ -157,7 +163,8 @@ class TwoStepAdapter:
         s.code_correct += sum(t.code == t.row.code for t in traces)
         s.evaluations.append({"batch": self._batch_id, "rows": len(batch), "fresh": sum(f for _, f, _ in res)})
         return EvaluationBatch(outputs=[f"{t.group}|{t.code}" for t in traces],
-                               scores=[float(t.code == t.row.code) for t in traces],
+                               scores=[float(t.group == t.row.group if self.step == "route" else t.code == t.row.code)
+                                       for t in traces],
                                trajectories=traces, num_metric_calls=len(batch))
 
     # GEPAAdapter
@@ -197,7 +204,7 @@ class TwoStepAdapter:
 
     def _code_record(self, t: Trace) -> dict:
         given = self._group_text(t.group) if t.group else "(none: step 1 gave no group)"
-        inputs = f"Narrative: {t.row.narrative}\nMajor group given by step 1: {given}"
+        inputs = f"Narrative: {t.row.narrative}\nMajor group given {'(correct)' if self.oracle_group else 'by step 1'}: {given}"
         if t.group != t.row.group:
             fb = (f"Step 1 routed this to {given}, but the gold code is {self._gold(t)}, so this step could not be "
                   "right; nothing to learn here about choosing within a group.")
@@ -217,20 +224,21 @@ class TwoStepAdapter:
 def run_official(seed: dict[str, str], train: list[Row], val: list[Row], book: dict, *, task_client: ModelClient,
                  reflect_client: ModelClient, max_metric_calls: int, minibatch: int, seed_value: int,
                  task_config: ModelConfig | None = None, reflect_config: ModelConfig | None = None,
-                 run_dir: str | None = None, sampling_strategy=None, **gepa_kw):
-    """One official-GEPA run on the two-step program (osha_sir's bridge; GEPA's round-robin over components)."""
+                 run_dir: str | None = None, sampling_strategy=None, step: str | None = None, **gepa_kw):
+    """One official-GEPA run on the two-step program (osha_sir's bridge; GEPA's round-robin over components).
+    `step` optimizes one component alone against its own labels (decoupled mode); `seed` then holds just that one."""
     import gepa
 
     bridge = Bridge()
     try:
-        adapter = TwoStepAdapter(task_client, book, bridge, config=task_config)
+        adapter = TwoStepAdapter(task_client, book, bridge, config=task_config, step=step)
         lm = ClientLM(reflect_client, bridge, reflect_config)
         if hasattr(sampling_strategy, "bind"):
             sampling_strategy.bind(bridge)
         stall = StallStopper(adapter)
         adapter.stall, adapter.logger = stall, gepa_kw.pop("logger", _Quiet())
         result = gepa.optimize(
-            seed_candidate=dict(seed), trainset=train, valset=val, adapter=adapter, reflection_lm=lm,
+            seed_candidate={step: seed[step]} if step else dict(seed), trainset=train, valset=val, adapter=adapter, reflection_lm=lm,
             reflection_minibatch_size=minibatch, max_metric_calls=max_metric_calls, seed=seed_value, run_dir=run_dir,
             sampling_strategy=sampling_strategy, raise_on_exception=True, stop_callbacks=[stall],
             logger=adapter.logger, module_selector="round_robin", **gepa_kw)

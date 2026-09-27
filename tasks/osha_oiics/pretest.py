@@ -6,7 +6,9 @@ Mock task model: step 1 names the gold group only if the route prompt carries "[
 step 2 names the gold code only if the code prompt carries "[rule <code>]", else the first listed code. Mock
 reflector: appends a rule for the most frequent gold in GEPA's feedback to the component it was shown. So the search
 can climb only by rewriting both components. Checks: climbs; both components rewritten; GEPA rows == adapter rows;
-billed calls == client calls; <= 2 calls per row; q=4 (independent, q-EI with a hash embedder) runs.
+billed calls == client calls; <= 2 calls per row; q=4 (independent, q-EI with a hash embedder, q-EI on outcome vectors) runs.
+Decoupled mode (step=route / step=code, q=1): climbs on its own labels; only that component exists and changes;
+<= 1 call per row; the code step never sees a route prompt.
 """
 from __future__ import annotations
 
@@ -43,7 +45,7 @@ def main():
         return f"```\n{new}\n```"
 
     results = {}
-    for arm in ("q1", "independent4", "qei4"):
+    for arm in ("q1", "independent4", "qei4", "qei4o"):
         sampling = None
         if arm == "independent4":
             from gepa.strategies.proposal_sampling import IndependentSampling
@@ -51,6 +53,9 @@ def main():
         elif arm == "qei4":
             from tasks.osha_sir.qei_sampling import QEISampling
             sampling = QEISampling(4, HashEmbedder(), seed=0)
+        elif arm == "qei4o":
+            from tasks.osha_sir.qei_sampling import QEISampling
+            sampling = QEISampling(4, seed=0, features="outcomes")
         tc = MockClient(task, budget=Budget(max_calls=4000), default_config=ModelConfig(model="mock-task"))
         rc = MockClient(reflect, default_config=ModelConfig(model="mock-reflect"))
         res, ad, lm = run_official(seed, train, val, book, task_client=tc, reflect_client=rc, max_metric_calls=1500,
@@ -66,6 +71,28 @@ def main():
               and out["billed"] == out["client_calls"] and out["billed"] + out["cache_hits"] <= 2 * out["adapter_rows"])
         print(f"[{'PASS' if ok else 'FAIL'}] {arm}: {out}")
         results[arm] = ok
+    for step in ("route", "code"):
+        prompts = []
+
+        def spy(prompt, cfg, schema, _p=prompts):
+            _p.append(prompt)
+            return task(prompt, cfg, schema)
+        tc = MockClient(spy, budget=Budget(max_calls=4000), default_config=ModelConfig(model="mock-task"))
+        rc = MockClient(reflect, default_config=ModelConfig(model="mock-reflect"))
+        res, ad, lm = run_official(seed, train, val, book, task_client=tc, reflect_client=rc, max_metric_calls=1500,
+                                   minibatch=15, seed_value=0, step=step)
+        s = ad.stats
+        route_calls = sum("Pick the major group" in p for p in prompts)
+        out = {"seed_val": round(res.val_aggregate_scores[0], 3), "best_val": round(max(res.val_aggregate_scores), 3),
+               "components": sorted({k for c in res.candidates for k in c}),
+               "rewritten": any(c[step] != seed[step] for c in res.candidates), "gepa_rows": res.total_metric_calls,
+               "adapter_rows": s.requested, "billed": s.billed, "cache_hits": tc.usage.cache_hits,
+               "route_calls": route_calls, "calls": len(prompts)}
+        ok = (out["best_val"] > out["seed_val"] and out["components"] == [step] and out["rewritten"]
+              and out["gepa_rows"] == out["adapter_rows"] and out["billed"] + out["cache_hits"] <= out["adapter_rows"]
+              and (route_calls == len(prompts) if step == "route" else route_calls == 0))
+        print(f"[{'PASS' if ok else 'FAIL'}] decoupled {step}: {out}")
+        results[f"decoupled_{step}"] = ok
     assert all(results.values()), results
 
 

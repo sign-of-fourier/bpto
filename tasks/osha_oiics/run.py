@@ -5,6 +5,9 @@
     python -m tasks.osha_oiics.run score C0 A --split val     # pilot: both steps, 2 repeats
     python -m tasks.osha_oiics.run score A --oracle           # step 2 alone, handed the gold group (its ceiling)
     python -m tasks.osha_oiics.run gepa --arm q1 --seed 0     # one optimizer run (B=5000 rows, minibatch 15)
+    python -m tasks.osha_oiics.run gepa --arm q1 --seed 0 --step route --tag dec_   # decoupled: one step alone,
+    python -m tasks.osha_oiics.run gepa --arm q1 --seed 0 --step code --tag dec_    #   scored on its own labels
+    python -m tasks.osha_oiics.run combine --tag dec_ --arm q1 --seeds 0 1   # best route + best code -> prompts/
 
 Prompt sets live in runs/osha_oiics/prompts/<name>.json: {"route": ..., "code": ..., "meta": {...}}.
 """
@@ -181,12 +184,13 @@ def gepa_run(args):
     book = codebook()
     train, val = rows("train"), rows("val")[: args.val_n]
     seed = load(args.seed_prompt)
+    name = f"{args.tag}{args.arm}{'_' + args.step if args.step else ''}_s{args.seed}"
     spend = Budget(max_usd=args.max_usd)
     task = client(MICRO, Budget(max_calls=args.task_cap or int(args.B * 2.4), parent=spend), temperature=0.0,
                   max_tokens=args.task_max_tokens, concurrency=args.concurrency,
-                  cache=f"task_cache/{args.tag}{args.arm}_s{args.seed}.jsonl")
+                  cache=f"task_cache/{name}.jsonl")
     refl = client(LITE, Budget(parent=spend), temperature=1.0, max_tokens=4096, concurrency=args.concurrency,
-                  cache=f"reflect_log/{args.tag}{args.arm}_s{args.seed}.jsonl", replay=False)
+                  cache=f"reflect_log/{name}.jsonl", replay=False)
     sampling, emb = None, None
     if args.arm == "independent4":
         from gepa.strategies.proposal_sampling import IndependentSampling
@@ -195,18 +199,20 @@ def gepa_run(args):
         _env()
         emb = BedrockEmbedder(region=REGION, budget=spend)
         sampling = QEISampling(4, emb, seed=args.seed)
-    out = RUNS / "gepa" / f"{args.tag}{args.arm}_s{args.seed}"
+    elif args.arm == "qei4o":  # q-EI on per-row validation outcomes instead of text embeddings
+        sampling = QEISampling(4, seed=args.seed, features="outcomes")
+    out = RUNS / "gepa" / name
     out.mkdir(parents=True, exist_ok=True)
     t0, err = time.time(), None
     try:
         res, adapter, lm = run_official(seed, train, val, book, task_client=task, reflect_client=refl,
                                         max_metric_calls=args.B, minibatch=args.minibatch, seed_value=args.seed,
-                                        run_dir=str(out / "gepa_state"), sampling_strategy=sampling)
+                                        run_dir=str(out / "gepa_state"), sampling_strategy=sampling, step=args.step)
     except Exception as e:  # BudgetExceeded included: record what was spent, then re-raise
         err = e
         raise
     finally:
-        summary = {"arm": args.arm, "seed": args.seed, "seed_prompt": args.seed_prompt, "B": args.B,
+        summary = {"arm": args.arm, "step": args.step, "seed": args.seed, "seed_prompt": args.seed_prompt, "B": args.B,
                    "val_n": len(val), "minibatch": args.minibatch, "secs": round(time.time() - t0, 1),
                    "spent_usd": round(spend.spent_usd, 4), "task_calls_billed": task.usage.calls,
                    "task_cache_hits": task.usage.cache_hits, "task_tokens": [task.usage.input_tokens, task.usage.output_tokens],
@@ -225,10 +231,21 @@ def gepa_run(args):
             (out / "best_prompt.json").write_text(json.dumps(res.best_candidate, indent=1, ensure_ascii=False))
             (out / "candidates.json").write_text(json.dumps(res.candidates, indent=1, ensure_ascii=False))
             (out / "gepa_log.txt").write_text("\n".join(adapter.logger.lines))
-            if args.arm == "qei4":
+            if args.arm in ("qei4", "qei4o"):
                 (out / "qei_log.json").write_text(json.dumps(sampling.log, indent=1, default=str))
         (out / "summary.json").write_text(json.dumps(summary, indent=2))
         print(json.dumps({k: v for k, v in summary.items() if k not in ("discovery_calls", "parents", "val_scores")}, indent=1))
+
+
+def combine(args):
+    """Decoupled runs -> one program per seed: the route run's best route with the code run's best code."""
+    for k in args.seeds:
+        d = {st: RUNS / "gepa" / f"{args.tag}{args.arm}_{st}_s{k}" for st in ("route", "code")}
+        best = {st: json.loads((d[st] / "best_prompt.json").read_text())[st] for st in d}
+        summ = {st: json.loads((d[st] / "summary.json").read_text()) for st in d}
+        save(f"{args.tag}{args.arm}_s{k}", best["route"], best["code"],
+             {"op": "combine", "from": {st: str(d[st]) for st in d},
+              "step_val": {st: [summ[st]["seed_val"], summ[st]["best_val"]] for st in d}})
 
 
 def main(argv=None):
@@ -244,7 +261,7 @@ def main(argv=None):
     sc.add_argument("--max-usd", type=float, default=0.50)
     sc.add_argument("--concurrency", type=int, default=16)
     g = sub.add_parser("gepa")
-    g.add_argument("--arm", choices=["q1", "independent4", "qei4"], required=True)
+    g.add_argument("--arm", choices=["q1", "independent4", "qei4", "qei4o"], required=True)
     g.add_argument("--seed", type=int, default=0)
     g.add_argument("--B", type=int, default=5000)
     g.add_argument("--val-n", type=int, default=200)
@@ -255,8 +272,14 @@ def main(argv=None):
     g.add_argument("--task-max-tokens", type=int, default=1024)
     g.add_argument("--concurrency", type=int, default=16)
     g.add_argument("--tag", default="")
+    g.add_argument("--step", choices=["route", "code"], default=None, help="decoupled: optimize one step alone")
+    cb = sub.add_parser("combine")
+    cb.add_argument("--tag", default="dec_")
+    cb.add_argument("--arm", default="q1")
+    cb.add_argument("--seeds", type=int, nargs="+", default=[0, 1, 2, 3, 4])
     args = ap.parse_args(argv)
-    {"control": control, "author": author, "gepa": lambda: gepa_run(args), "score": lambda: score(args)}[args.cmd]()
+    {"control": control, "author": author, "gepa": lambda: gepa_run(args), "score": lambda: score(args),
+     "combine": lambda: combine(args)}[args.cmd]()
 
 
 if __name__ == "__main__":
