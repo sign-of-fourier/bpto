@@ -17,7 +17,7 @@ from statistics import mean, pstdev
 
 from .run import PROMPTS, RUNS
 
-ARMS = ["q1", "independent4", "qei4"]
+ARMS = ["q1", "independent4", "qei4", "qei4o"]
 REFERENCE = ["C0", "A"]
 
 

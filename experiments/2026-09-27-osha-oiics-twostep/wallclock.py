@@ -78,7 +78,7 @@ a2.axhline(b2, color=MUTED, linewidth=1.5, linestyle=(0, (4, 3)), zorder=2)
 a2.annotate(f"seed program A = {b2:.3f}", (a2.get_xlim()[0], b2 + 0.002), fontsize=9, color=MUTED, va="bottom")
 a1.axhline(0, color=MUTED, linewidth=1.5, linestyle=(0, (4, 3)), zorder=2)
 a1.yaxis.set_major_formatter(matplotlib.ticker.FuncFormatter(lambda v, _: f"{v * 100:+.0f} pts" if v else "seed"))
-a1.set_title(f"Best validation exact-code accuracy so far, gain over the run's own seed score\n(200 val rows; mean of {len(runs) // len(ARMS)} seeds, thin = each seed)",
+a1.set_title(f"Best validation exact-code accuracy so far, gain over the run's own seed score\n(200 val rows; mean of {sum(r['arm'] == ARMS[0][0] for r in runs)} seeds, thin = each seed)",
              fontsize=10, color=INK, loc="left")
 a2.set_title("Holdout exact-code accuracy of the\nreturned program vs run time", fontsize=10, color=INK, loc="left")
 a1.set_xlabel("wall-clock (s)", fontsize=9, color=MUTED)

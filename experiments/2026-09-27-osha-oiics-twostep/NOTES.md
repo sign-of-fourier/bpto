@@ -154,8 +154,34 @@ parent's and child's scores on them.
   in flight already binds at q=4. Prediction for q=8 at the same concurrency: about 10% faster than q=4.
 - **The GP's inputs:** 2-9 distinct programs per fit (median 6), and 4 PCs explain a median of 95% of the pool's
   embedding variance, so a larger PCA k has nothing to add. The open question is the input itself: a text embedding
-  tracks wording, not behaviour. The `qei4o` arm (`QEISampling(features="outcomes")`) uses each program's per-row
-  val correctness vector instead. It is built and passes the offline checks, but has not been run live.
+  tracks wording, not behaviour; the next section tests the alternative.
+
+## q-EI on outcome vectors (`qei4o`, added 2026-09-27, $2.3)
+
+`QEISampling(features="outcomes")`: the GP input is each program's per-row correctness on the 200 val rows (GEPA's
+`prog_candidate_val_subscores`), so programs that get the same rows right are close. Titan is not used. Everything
+else is the `qei4` arm unchanged. 5 seeds, same settings; three runs at a time, as in the main race.
+
+| arm | holdout code (5 seeds) | holdout group | val gain | gate-passed children: gain over parent | wall-clock |
+|---|---|---|---|---|---|
+| seed A | 0.407 | 0.653 | - | - | - |
+| q-EI, text embedding (`qei4`) | 0.437 ± .033 | 0.667 | +5.9 | +0.5 pts (42/76 beat parent) | 672 s |
+| q-EI, outcome vectors (`qei4o`) | **0.407 ± .022** | 0.660 | +3.9 | −0.2 pts (39/79) | 689 s |
+| independent q=4 | 0.425 ± .049 | 0.678 | +5.6 | +0.1 pts (35/77) | 724 s |
+
+- **No improvement over the seed.** On the holdout `qei4o` lands exactly on seed A (0.407); only 2 of 5 runs are
+  above it. It trails text q-EI by 3 points (about 1.5 standard errors on 5 seeds), so this is at best no benefit,
+  not a proven loss.
+- **Why: the GP found no local structure.** Programs in the pool disagree on 3-57 of 200 rows (median 32, about 5.7
+  apart in Euclidean distance). The fitted lengthscale has a median of 48, against 4.9 for text, which is at or near
+  the top of `GPR`'s grid (10× the median distance). The GP treats the whole pool as one smooth surface, and the
+  acquisition follows the posterior mean. No fit was flagged flat, because EI still varied with the mean, so
+  `BOSelector`'s flat warning misses this failure mode. Parent statistics look like the other arms': 3.4 distinct
+  parents per round, 62% of parents on the Pareto front.
+- **Reading:** a behavioural input does not help when children are no better than their parents. There is no local
+  structure for any input representation to find. The input matters only once the mutator produces heritable gains,
+  which points back at the mutator (`reflect_rows`), not the surrogate.
+- **bpto gap:** a lengthscale at the top of the grid should warn, just as a flat acquisition does.
 
 ## Harness notes
 
@@ -169,10 +195,9 @@ parent's and child's scores on them.
 Main runs $6.13 (15 runs, $0.34-0.56 each), holdout scoring about $0.92, pilot and smoke run about $0.17, Opus
 authoring of A about $0.15-0.80 (not metered; one timed-out attempt was retried by botocore). **Total ≈ $7.5-8**
 (estimate $12, cap $20). The joint-vs-decoupled follow-up added $4.14 in runs and $0.34 in holdout scoring (estimate $3), so the
-total for this experiment is about $12-12.5.
+total for this experiment is about $12-12.5. The `qei4o` arm added $2.02 in runs and $0.24 in holdout scoring (about $14.5 in total).
 
 ## Not done
 
 - **More seeds** to separate the arms on the holdout.
-- **A live run of `qei4o`** (q-EI on outcome vectors): about $2.3 for 5 seeds.
 - **A length- or cost-constrained objective** (see finding 4). The user said not this iteration.

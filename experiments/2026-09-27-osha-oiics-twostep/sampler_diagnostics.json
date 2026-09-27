@@ -289,5 +289,102 @@
    "reflect_wall_est": 124,
    "secs": 569.2
   }
+ ],
+ "qei4o": [
+  {
+   "iters": 14,
+   "proposals": 56,
+   "pool_mean": 8.7,
+   "distinct_parents_per_iter": 3.57,
+   "parent_is_best_val": 0.25,
+   "parent_rank_pct": 0.37,
+   "gate": {
+    "tie": 0.45,
+    "worse": 0.27,
+    "better": 0.29
+   },
+   "accepted_gain_vs_parent": -0.0075,
+   "accepted_beat_parent": "8/16",
+   "reflect_s_sum": 393,
+   "reflect_s_mean": 7.0,
+   "reflect_wall_est": 98,
+   "secs": 818.4
+  },
+  {
+   "iters": 13,
+   "proposals": 52,
+   "pool_mean": 8,
+   "distinct_parents_per_iter": 3.23,
+   "parent_is_best_val": 0.35,
+   "parent_rank_pct": 0.38,
+   "gate": {
+    "worse": 0.25,
+    "tie": 0.42,
+    "better": 0.33
+   },
+   "accepted_gain_vs_parent": 0.0079,
+   "accepted_beat_parent": "11/17",
+   "reflect_s_sum": 411,
+   "reflect_s_mean": 7.9,
+   "reflect_wall_est": 103,
+   "secs": 602.3
+  },
+  {
+   "iters": 17,
+   "proposals": 68,
+   "pool_mean": 6.6,
+   "distinct_parents_per_iter": 3.18,
+   "parent_is_best_val": 0.34,
+   "parent_rank_pct": 0.35,
+   "gate": {
+    "tie": 0.41,
+    "worse": 0.37,
+    "better": 0.22
+   },
+   "accepted_gain_vs_parent": -0.0093,
+   "accepted_beat_parent": "5/15",
+   "reflect_s_sum": 539,
+   "reflect_s_mean": 7.6,
+   "reflect_wall_est": 135,
+   "secs": 785.1
+  },
+  {
+   "iters": 17,
+   "proposals": 68,
+   "pool_mean": 8.4,
+   "distinct_parents_per_iter": 3.53,
+   "parent_is_best_val": 0.18,
+   "parent_rank_pct": 0.48,
+   "gate": {
+    "tie": 0.46,
+    "worse": 0.32,
+    "better": 0.22
+   },
+   "accepted_gain_vs_parent": -0.004,
+   "accepted_beat_parent": "5/15",
+   "reflect_s_sum": 408,
+   "reflect_s_mean": 6.0,
+   "reflect_wall_est": 102,
+   "secs": 709.2
+  },
+  {
+   "iters": 16,
+   "proposals": 64,
+   "pool_mean": 9.3,
+   "distinct_parents_per_iter": 3.5,
+   "parent_is_best_val": 0.16,
+   "parent_rank_pct": 0.54,
+   "gate": {
+    "tie": 0.5,
+    "worse": 0.25,
+    "better": 0.25
+   },
+   "accepted_gain_vs_parent": 0.0044,
+   "accepted_beat_parent": "10/16",
+   "reflect_s_sum": 383,
+   "reflect_s_mean": 6.0,
+   "reflect_wall_est": 96,
+   "secs": 529.6
+  }
  ]
 }

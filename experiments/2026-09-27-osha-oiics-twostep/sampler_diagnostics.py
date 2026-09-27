@@ -10,7 +10,7 @@ from pathlib import Path
 from statistics import mean
 
 G, R = Path("runs/osha_oiics/gepa"), Path("runs/osha_oiics")
-ARMS = ["q1", "independent4", "qei4"]
+ARMS = [a for a in ["q1", "independent4", "qei4", "qei4o"] if (G / f"main_{a}_s4/summary.json").exists()]
 
 
 def one(arm, seed):
