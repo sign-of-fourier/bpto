@@ -13,6 +13,10 @@ so the arm differs from `IndependentSampling(q)` in one decision: *which* q pare
   warmup  GEPA's Pareto sampler (q independent draws) until `warmup` candidates have observations.
   q       always q tasks: when the pool (or the joint pick) has fewer than q distinct parents, the picks repeat, each
           with its own minibatch - as IndependentSampling does - so every iteration proposes q children.
+  input   `features="text"` (default): the embedder's vector of the candidate's text. `features="outcomes"`: the
+          program's per-row scores on the validation set (GEPA's `prog_candidate_val_subscores`, val ids in order),
+          so two programs are close when they get the same rows right; no embedder call. Its mean is the program's
+          own full score, so the input carries "how good" as well as "which rows".
 """
 from __future__ import annotations
 
@@ -55,10 +59,35 @@ def observations(state) -> list[tuple[int, float, float]]:
     return out
 
 
+def candidate_text(cand: dict[str, str]) -> str:
+    """What gets embedded: the one instruction (osha_sir, unchanged), or every component in order under its name,
+    cut to Titan V2's input limit (50k characters)."""
+    if list(cand) == ["instruction"]:
+        return cand["instruction"]
+    return "\n\n".join(f"[{k}]\n{v}" for k, v in cand.items())[:45000]
+
+
+def outcome_vector(state, i: int) -> list[float]:
+    """Program i's score on every validation row, in val-id order; a row it was not evaluated on gets its mean."""
+    sub = state.prog_candidate_val_subscores[i]
+    ids = sorted({k for s in state.prog_candidate_val_subscores for k in s})
+    fill = sum(sub.values()) / len(sub) if sub else 0.0
+    return [float(sub.get(k, fill)) for k in ids]
+
+
+class _NoEmbedder:
+    """features="outcomes" fills every node's input itself; reaching the embedder is a bug."""
+
+    async def embed(self, texts):
+        raise RuntimeError("QEISampling(features='outcomes') should never embed text")
+
+
 class QEISampling:
-    def __init__(self, q: int, embedder, *, warmup: int = 2, pca: int | None = 4, seed: int = 0, batch=None):
-        self.q, self.embedder, self.warmup = q, embedder, warmup
-        self.bo = BOSelector(embedder, GPR(), EI(), value=self._value, noise=self._noise, transform="pit",
+    def __init__(self, q: int, embedder=None, *, warmup: int = 2, pca: int | None = 4, seed: int = 0, batch=None,
+                 features: str = "text"):
+        assert features in ("text", "outcomes") and (embedder is not None or features == "outcomes")
+        self.q, self.embedder, self.warmup, self.features = q, embedder, warmup, features
+        self.bo = BOSelector(embedder or _NoEmbedder(), GPR(), EI(), value=self._value, noise=self._noise, transform="pit",
                              pca=pca, batch=batch or QEI(seed=seed))
         self.rng = random.Random(seed)
         self.nodes: dict[int, _Node] = {}
@@ -79,7 +108,9 @@ class QEISampling:
     def sample_tasks(self, state, candidate_selector, batch_sampler, trainset) -> list[ProposalTask]:
         for i, cand in enumerate(state.program_candidates):
             if i not in self.nodes:
-                self.nodes[i] = _Node(i, cand["instruction"])
+                self.nodes[i] = _Node(i, candidate_text(cand))
+            if self.features == "outcomes" and self.nodes[i].embedding is None:
+                self.nodes[i].embedding = outcome_vector(state, i)
         for n in self.nodes.values():
             n.obs, n.ses = [], []
         for p, est, se in observations(state):

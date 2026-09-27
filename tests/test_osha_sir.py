@@ -32,3 +32,17 @@ def test_official_gepa_runs_through_bpto_clients():
     smp = QEISampling(4, HashEmbedder(), seed=0)
     one_run(B=600, seed=0, sampling=smp)
     assert all(len(e["parents"]) == 4 for e in smp.log) and any(e["mode"] == "qei" for e in smp.log)
+
+
+def test_qei_outcome_features_are_per_row_val_scores():
+    from types import SimpleNamespace
+
+    from tasks.osha_sir.qei_sampling import QEISampling, outcome_vector
+
+    st = SimpleNamespace(prog_candidate_val_subscores=[{0: 1.0, 1: 0.0, 2: 1.0}, {0: 0.0, 2: 1.0}])
+    assert outcome_vector(st, 0) == [1.0, 0.0, 1.0]
+    assert outcome_vector(st, 1) == [0.0, 0.5, 1.0]  # a row it was not evaluated on gets its mean
+    QEISampling(4, features="outcomes")  # no embedder needed
+    import pytest
+    with pytest.raises(AssertionError):
+        QEISampling(4)  # text features still need one
