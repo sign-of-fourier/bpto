@@ -82,6 +82,18 @@ Per run: `table.md`, `evaluations.jsonl`. Reference prompts on the holdout (val 
    when the search does climb (the synthetic ladder says it needs slightly more calls than q=1 for the same level:
    ~124 vs 103 evaluations at q=4).
 
+## Accuracy against wall-clock (added 2026-09-27, `wallclock.py`, $0)
+
+![accuracy against wall-clock](wallclock.png)
+
+Asked for as the test of "same accuracy, less time". Candidate times are interpolated from GEPA's call counts, anchored
+on the mtimes of its per-row val outputs (throughput is steady within a run). The left panel is each run's gain over
+its own seed score, because the seed's val score varies .715-.755 across runs. **The plot shows no time advantage
+in accuracy, because there is no accuracy to reach**: every arm's mean val gain stays within ~1 pt of the seed
+(q1 +1.0, independent +0.7, q-EI +0.6 at their ends; at 422 s q1 is at +0.8), inside the ±2-4 pt noise of a 200-row
+score, and none of it transfers to the holdout (right). q-EI's 1.65x only means the same non-result arrives sooner.
+The case where the plot can favour q > 1 is a search that climbs: the B0-seeded race (backlog).
+
 ## Official GEPA through bpto: what the pre-tests found (`pretest_0a.json`, `pretest_0b_*.json`)
 
 - Offline (mock, $0), 12/12 checks: runs, climbs, same seed -> same run, resume works (does not replay exactly),
