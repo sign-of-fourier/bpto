@@ -55,6 +55,14 @@ def observations(state) -> list[tuple[int, float, float]]:
     return out
 
 
+def candidate_text(cand: dict[str, str]) -> str:
+    """What gets embedded: the one instruction (osha_sir, unchanged), or every component in order under its name,
+    cut to Titan V2's input limit (50k characters)."""
+    if list(cand) == ["instruction"]:
+        return cand["instruction"]
+    return "\n\n".join(f"[{k}]\n{v}" for k, v in cand.items())[:45000]
+
+
 class QEISampling:
     def __init__(self, q: int, embedder, *, warmup: int = 2, pca: int | None = 4, seed: int = 0, batch=None):
         self.q, self.embedder, self.warmup = q, embedder, warmup
@@ -79,7 +87,7 @@ class QEISampling:
     def sample_tasks(self, state, candidate_selector, batch_sampler, trainset) -> list[ProposalTask]:
         for i, cand in enumerate(state.program_candidates):
             if i not in self.nodes:
-                self.nodes[i] = _Node(i, cand["instruction"])
+                self.nodes[i] = _Node(i, candidate_text(cand))
         for n in self.nodes.values():
             n.obs, n.ses = [], []
         for p, est, se in observations(state):

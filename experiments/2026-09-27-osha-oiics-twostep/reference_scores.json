@@ -1,0 +1,12 @@
+{
+ "C0": {
+  "code_acc": 0.4125,
+  "group_acc": 0.605,
+  "code_acc_given_group": 0.682
+ },
+ "A": {
+  "code_acc": 0.4075,
+  "group_acc": 0.6525,
+  "code_acc_given_group": 0.6245
+ }
+}

@@ -79,14 +79,16 @@ def parse_json_reply(text: str, schema: type[BaseModel]) -> BaseModel:
 
 class BedrockClient(ModelClient):
     def __init__(self, model: str = "amazon.nova-micro-v1:0", region: str | None = None, *,
-                 profile: str | None = None, max_retries: int = 4, **kw):
+                 profile: str | None = None, max_retries: int = 4, read_timeout: float | None = None, **kw):
         import boto3
         from botocore.config import Config
 
         cfg = kw.pop("default_config", None) or ModelConfig(model=model)
         super().__init__(default_config=cfg, **kw)
         session = boto3.Session(profile_name=profile, region_name=region)
-        self._rt = session.client("bedrock-runtime", config=Config(retries={"max_attempts": max_retries, "mode": "adaptive"}))
+        extra = {"read_timeout": read_timeout} if read_timeout else {}  # botocore's default is 60 s: long generations need more
+        self._rt = session.client("bedrock-runtime", config=Config(retries={"max_attempts": max_retries, "mode": "adaptive"},
+                                                                   **extra))
 
     def _params(self, prompt: str, cfg: ModelConfig, schema) -> dict:
         p: dict = {

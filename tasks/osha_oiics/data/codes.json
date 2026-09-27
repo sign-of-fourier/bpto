@@ -1,0 +1,163 @@
+{
+ "groups": {
+  "11": "Intentional injury by person",
+  "12": "Injury by person—unintentional or intent unknown",
+  "13": "Animal and insect related incidents",
+  "23": "Animal and other non-motorized vehicle transportation incidents",
+  "24": "Pedestrian vehicular incident",
+  "26": "Roadway incidents involving motorized land vehicle",
+  "27": "Nonroadway incidents involving motorized land vehicles",
+  "41": "Slip or trip without fall",
+  "42": "Falls on same level",
+  "43": "Falls to lower level",
+  "44": "Jumps to lower level",
+  "51": "Exposure to electricity",
+  "55": "Exposure to other harmful substances",
+  "62": "Struck by object or equipment",
+  "63": "Struck against object or equipment",
+  "64": "Caught in or compressed by equipment or objects",
+  "71": "Overexertion involving outside sources",
+  "73": "Other exertions or bodily reactions"
+ },
+ "codes": {
+  "11": {
+   "1111": "Shooting by other person-intentional",
+   "1112": "Stabbing, cutting, slashing, piercing",
+   "1113": "Hitting, kicking, beating, shoving",
+   "1119": "Intentional injury by other person, n.e.c."
+  },
+  "12": {
+   "1211": "Shooting by other person-unintentional",
+   "1214": "Injured by physical contact with person while restraining, subduing-unintentional",
+   "1219": "Injury by other person-unintentional or intent unknown, n.e.c.",
+   "1221": "Self-inflicted shooting-unintentional"
+  },
+  "13": {
+   "1311": "Stings and venomous bites",
+   "1313": "Other animal bites, nonvenomous",
+   "1322": "Kicked by animal",
+   "1324": "Gored or rammed by animal",
+   "1329": "Struck by animal, n.e.c."
+  },
+  "23": {
+   "2313": "Thrown, fell, or jumped from animal being ridden"
+  },
+  "24": {
+   "2412": "Pedestrian struck by forward-moving vehicle in work zone",
+   "2422": "Pedestrian struck by forward-moving vehicle in roadway",
+   "2441": "Pedestrian struck by vehicle propelled by another vehicle in nonroadway area",
+   "2442": "Pedestrian struck by forward-moving vehicle in nonroadway area",
+   "2443": "Pedestrian struck by vehicle backing up in nonroadway area",
+   "2449": "Pedestrian struck by vehicle in nonroadway area, n.e.c."
+  },
+  "26": {
+   "2631": "Jack-knifed or overturned, roadway",
+   "2636": "Fall or jump from vehicle in normal operation, roadway"
+  },
+  "27": {
+   "2712": "Moving in opposite directions, oncoming, nonroadway",
+   "2713": "Collision between a moving and standing vehicle, nonroadway",
+   "2721": "Part of occupant's body caught between vehicle and other object in nonroadway transport incident",
+   "2729": "Nonroadway collision with object other than vehicle, n.e.c.",
+   "2731": "Jack-knifed or overturned, nonroadway",
+   "2732": "Ran off driving surface, nonroadway",
+   "2733": "Struck by shifting load during transport, nonroadway",
+   "2734": "Fall or jump from and struck by same vehicle in normal operation, nonroadway",
+   "2736": "Fall or jump from vehicle in normal operation, nonroadway",
+   "2738": "Struck bump, hole, rough terrain on driving surface, nonroadway",
+   "2739": "Nonroadway noncollision incident, n.e.c."
+  },
+  "41": {
+   "4111": "Slip on substance without fall",
+   "4119": "Slip without fall, n.e.c.",
+   "4123": "Trip over an object without fall"
+  },
+  "42": {
+   "4211": "Fall on same level while climbing stairs, steps, or curbs",
+   "4212": "Fall on same level due to tripping on uneven surface",
+   "4213": "Fall on same level due to tripping over an object",
+   "4214": "Fall on same level due to tripping over self",
+   "4219": "Fall on same level due to tripping, n.e.c."
+  },
+  "43": {
+   "4311": "Fall from collapsing structure or equipment less than 6 feet",
+   "4312": "Fall from collapsing structure or equipment 6 to 10 feet",
+   "4313": "Fall from collapsing structure or equipment 11 to 15 feet",
+   "4314": "Fall from collapsing structure or equipment 16 to 20 feet",
+   "4321": "Fall through surface or existing opening less than 6 feet",
+   "4322": "Fall through surface or existing opening 6 to 10 feet",
+   "4323": "Fall through surface or existing opening 11 to 15 feet",
+   "4324": "Fall through surface or existing opening 16 to 20 feet",
+   "4325": "Fall through surface or existing opening 21 to 25 feet",
+   "4326": "Fall through surface or existing opening 26 to 30 feet",
+   "4327": "Fall through surface or existing opening more than 30 feet",
+   "4331": "Other fall to lower level less than 6 feet",
+   "4332": "Other fall to lower level 6 to 10 feet",
+   "4333": "Other fall to lower level 11 to 15 feet",
+   "4334": "Other fall to lower level 16 to 20 feet",
+   "4335": "Other fall to lower level 21 to 25 feet",
+   "4336": "Other fall to lower level 26 to 30 feet",
+   "4337": "Other fall to lower level more than 30 feet"
+  },
+  "44": {
+   "4421": "Other jump to lower level less than 6 feet"
+  },
+  "51": {
+   "5111": "Direct exposure to electricity, 220 volts or less",
+   "5112": "Direct exposure to electricity, greater than 220 volts",
+   "5122": "Indirect exposure to electricity, greater than 220 volts"
+  },
+  "55": {
+   "5521": "Inhalation of harmful substance-single episode",
+   "5544": "Exposure through intact skin, eyes, or other exposed tissue"
+  },
+  "62": {
+   "6211": "Caught between rolling powered vehicle and other object",
+   "6212": "Struck or run over by rolling powered vehicle",
+   "6213": "Struck by swinging part of powered vehicle",
+   "6214": "Struck by falling part of powered vehicle still attached",
+   "6216": "Struck by other falling powered vehicle",
+   "6219": "Struck by powered vehicle-nontransport, n.e.c.",
+   "6221": "Struck by rolling object or equipment being pushed by injured worker",
+   "6223": "Struck by object or equipment rolling freely",
+   "6229": "Struck by rolling object or equipment-other than powered vehicle, n.e.c.",
+   "6231": "Struck by object or equipment dropped by injured worker",
+   "6232": "Struck by object or equipment dropped by other person",
+   "6233": "Struck by object falling from vehicle or machinery-other than vehicle part",
+   "6239": "Struck by falling object or equipment, n.e.c.",
+   "6241": "Struck by dislodged flying object, particle",
+   "6242": "Struck by discharged object or substance",
+   "6249": "Struck by discharged or flying object, n.e.c.",
+   "6251": "Injured by object breaking in hand",
+   "6252": "Injured by slipping or swinging object held by injured worker",
+   "6253": "Injured by slipping or swinging object held by other person",
+   "6259": "Injured by handheld object or equipment, n.e.c.",
+   "6261": "Struck by or caught in swinging door or gate",
+   "6269": "Struck by swinging or slipping object, other than handheld, n.e.c."
+  },
+  "63": {
+   "6311": "Struck against moving part of machinery or equipment",
+   "6312": "Struck against object or equipment while moving it",
+   "6321": "Stepped on object",
+   "6322": "Struck against stationary object or equipment while rising",
+   "6329": "Struck against stationary object or equipment, n.e.c."
+  },
+  "64": {
+   "6411": "Caught in running equipment or machinery during maintenance, cleaning",
+   "6412": "Caught in running equipment or machinery during regular operation",
+   "6419": "Caught in running equipment or machinery, n.e.c."
+  },
+  "71": {
+   "7111": "Overexertion in lifting-single episode",
+   "7112": "Overexertion in lifting-multiple episodes",
+   "7121": "Overexertion in pushing, pulling, or turning-single episode",
+   "7131": "Overexertion in holding, carrying, or wielding-single episode"
+  },
+  "73": {
+   "7311": "Bending, crawling, reaching, twisting-single episode",
+   "7313": "Climbing or stepping up or down-single episode",
+   "7351": "Walking, without other incident-single episode",
+   "7371": "Boarding, alighting-excluding slip, trip, fall-single episode"
+  }
+ }
+}

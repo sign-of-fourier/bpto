@@ -1,0 +1,24 @@
+{
+ "route": "Classify this workplace injury narrative into one OIICS event or exposure major group:\n11 Intentional injury by person\n12 Injury by person—unintentional or intent unknown\n13 Animal and insect related incidents\n23 Animal and other non-motorized vehicle transportation incidents\n24 Pedestrian vehicular incident\n26 Roadway incidents involving motorized land vehicle\n27 Nonroadway incidents involving motorized land vehicles\n41 Slip or trip without fall\n42 Falls on same level\n43 Falls to lower level\n44 Jumps to lower level\n51 Exposure to electricity\n55 Exposure to other harmful substances\n62 Struck by object or equipment\n63 Struck against object or equipment\n64 Caught in or compressed by equipment or objects\n71 Overexertion involving outside sources\n73 Other exertions or bodily reactions\n\nAnswer with the major group only.\n\nNarrative: {narrative}",
+ "code": "This workplace injury narrative is in OIICS event major group {group}. Choose its detailed event code from:\n{codes}\n\nAnswer with the code only.\n\nNarrative: {narrative}",
+ "meta": {
+  "op": "control",
+  "model": null,
+  "slots": {
+   "route": {
+    "narrative": 1
+   },
+   "code": {
+    "narrative": 1,
+    "group": 1,
+    "codes": 1
+   }
+  },
+  "route_names_all_groups": true,
+  "chars": {
+   "route": 850,
+   "code": 167
+  },
+  "date": "2026-09-27"
+ }
+}

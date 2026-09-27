@@ -1,0 +1,35 @@
+{
+ "q1": {
+  "mean_secs": 1005.3,
+  "mean_val_gain_at_end": 0.058,
+  "mean_val_gain_at": {
+   "200": 0.01,
+   "400": 0.025,
+   "600": 0.037,
+   "800": 0.05
+  },
+  "holdout_mean": 0.4505
+ },
+ "independent4": {
+  "mean_secs": 723.9,
+  "mean_val_gain_at_end": 0.054,
+  "mean_val_gain_at": {
+   "200": 0.03,
+   "400": 0.044,
+   "600": 0.051,
+   "800": 0.054
+  },
+  "holdout_mean": 0.425
+ },
+ "qei4": {
+  "mean_secs": 671.9,
+  "mean_val_gain_at_end": 0.05,
+  "mean_val_gain_at": {
+   "200": 0.018,
+   "400": 0.044,
+   "600": 0.05,
+   "800": 0.059
+  },
+  "holdout_mean": 0.4365
+ }
+}
