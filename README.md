@@ -61,6 +61,8 @@ asyncio.run(main())
 
 Swap `AnthropicClient` for `OpenAICompatibleClient("llama-3.3-70b", base_url="http://localhost:8000/v1")`
 to run against vLLM/Ollama/OpenRouter/OpenAI; or subclass `ModelClient` and implement `_complete`.
+For judging, `jev_judge({...}, client=JevClient(...))` asks TypeSafe's Jev typed questions (yes/no probability,
+choice, rubric score) and returns one metric per question.
 
 ## Search loop with ancestor attribution (BO-ready)
 
@@ -161,7 +163,7 @@ plot_tree(tree, "tree.png", color_metric="accuracy")
 ```
 bpto/
   prompt.py   data.py   metrics.py   task.py
-  llm/        ModelClient (global concurrency, cache, budget), AnthropicClient, OpenAICompatibleClient, MockClient
+  llm/        ModelClient (global concurrency, cache, budget), AnthropicClient, OpenAICompatibleClient, JevClient, MockClient
   scoring.py  Scorer / Objective protocols; exact_match, token_count, llm_judge, Linear/ConstrainedObjective, pareto_front
   tree.py     Node lifecycle PROPOSED → EVALUATED → EXPANDED; ancestors / descendants(generations=k); save/load
   ops.py      random, guided, evaluate (chunked), Pipeline

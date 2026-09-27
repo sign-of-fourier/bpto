@@ -3,7 +3,7 @@ from .cache import CompletionCache
 from .mock import MockClient
 
 __all__ = ["PRICES", "price_for", "Budget", "BudgetExceeded", "Completion", "ModelClient", "ModelConfig", "Usage",
-           "CompletionCache", "MockClient", "AnthropicClient", "OpenAICompatibleClient", "BedrockClient"]
+           "CompletionCache", "MockClient", "AnthropicClient", "OpenAICompatibleClient", "BedrockClient", "JevClient"]
 
 
 def __getattr__(name):  # lazy: keep `anthropic` import off the hot path for tests
@@ -16,4 +16,7 @@ def __getattr__(name):  # lazy: keep `anthropic` import off the hot path for tes
     if name == "OpenAICompatibleClient":
         from .openai_compat import OpenAICompatibleClient
         return OpenAICompatibleClient
+    if name == "JevClient":
+        from .jev import JevClient
+        return JevClient
     raise AttributeError(name)

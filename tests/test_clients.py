@@ -138,3 +138,93 @@ def test_bedrock_parse_accepts_raw_newlines_in_strings():
         prompts: list[str]
     out = parse_json_reply('Sure:\n{"prompts": ["line one\nline two {x}", "b"]}', V)
     assert out.prompts[0] == "line one\nline two {x}"
+
+
+def _jev_reply(body):
+    answers = {}
+    for name, q in body["questions"].items():
+        if q["type"] == "noul":
+            answers[name] = {"type": "noul", "noul": 0.9}
+        elif q["type"] == "score":
+            answers[name] = {"type": "score", "score": 1.5, "confidence": 0.8,
+                             "legend": {str(i): c for i, c in enumerate(q["criteria"])},
+                             "probabilities": {"1": 0.5, "2": 0.5}}
+        else:
+            labels = list(q["criteria"])
+            answers[name] = {"type": "choice", "choice": labels[0], "confidence": 0.7,
+                             "probabilities": {labels[0]: 0.7, labels[1]: 0.3}}
+    return {"model": "typesafe/jev-1.13-20260917", "usage": {"input_tokens": 40, "output_tokens": 9}, "answers": answers}
+
+
+async def test_jev_client_request_shape_retry_and_cache():
+    from bpto import JevClient
+    from bpto.llm.jev import noul
+    seen = {"n": 0, "bodies": []}
+
+    def handler(req: httpx.Request):
+        seen["n"] += 1
+        if seen["n"] == 1:
+            return httpx.Response(429, text="slow down")
+        assert req.url.path == "/api/v1/systemone" and req.headers["authorization"] == "Bearer k"
+        body = json.loads(req.content)
+        seen["bodies"].append(body)
+        return httpx.Response(200, json=_jev_reply(body))
+
+    c = JevClient("jev-1.13", base_url="https://openrouter.ai/api", api_key="k", transport=httpx.MockTransport(handler))
+    qs = {"same": noul("Same person?")}
+    a = await c.ask({"a": "Ike", "b": "Dwight D. Eisenhower"}, qs)
+    assert a["same"]["noul"] == 0.9 and seen["n"] == 2
+    assert seen["bodies"][0] == {"state": {"a": "Ike", "b": "Dwight D. Eisenhower"}, "model": "jev-1.13",
+                                 "questions": {"same": {"type": "noul", "instructions": "Same person?"}}}
+    assert c.usage.input_tokens == 40 and c.usage.output_tokens == 9
+    assert await c.ask({"a": "Ike", "b": "Dwight D. Eisenhower"}, qs) == a and seen["n"] == 2  # cached
+    await c.ask({"b": "Dwight D. Eisenhower", "a": "Ike"}, qs)  # key order changes Jev's answer: sent as given, not cached
+    assert seen["n"] == 3 and list(seen["bodies"][-1]["state"]) == ["b", "a"]
+
+
+async def test_jev_client_rejects_text_prompts_and_bad_requests():
+    from bpto import JevClient
+    from bpto.llm.jev import choice, noul
+
+    sent = []
+
+    def handler(req):
+        sent.append(req)
+        return httpx.Response(400, json={"error": "bad question"})
+
+    c = JevClient(transport=httpx.MockTransport(handler), max_retries=3)
+    with pytest.raises(ValueError, match="use JevClient.ask"):
+        await c.complete("free text")
+    with pytest.raises(ValueError, match="noul, choice or score"):
+        await c.ask("s", {"q": {"type": "essay"}})
+    with pytest.raises(ValueError, match="1-255"):
+        choice("pick", {})
+    with pytest.raises(httpx.HTTPStatusError):  # 4xx other than 408/409/429 is not retried
+        await c.ask("s", {"q": noul("?")})
+    assert len(sent) == 1
+
+
+async def test_jev_judge_metrics_per_question():
+    from bpto import JevClient, jev_judge
+    from bpto.llm.jev import choice, noul, score
+    seen = {}
+
+    def handler(req):
+        seen["body"] = json.loads(req.content)
+        return httpx.Response(200, json=_jev_reply(seen["body"]))
+
+    jev = JevClient(transport=httpx.MockTransport(handler))
+
+    def answerer(prompt, cfg, schema):
+        return Out(answer="Paris")
+
+    scorer = jev_judge({"correct": noul("Same answer as the reference?"),
+                        "grade": score("How close?", ["wrong", "partial", "right, verbose", "exact"]),
+                        "kind": choice("What kind of answer?", {"city": None, "country": None})}, client=jev)
+    task = Task(root="Q: {question}", dataset=Dataset.from_records([
+        {"inputs": {"question": "capital of France?"}, "answer": "Paris"}]),
+        schema=Out, scorer=scorer, objective=LinearObjective(correct=1.0), client=MockClient(answerer))
+    tree = Tree(task)
+    await tree.apply(evaluate(), select=select.root)
+    assert tree.root.evaluation.metrics == pytest.approx({"correct": 0.9, "grade": 0.5, "kind.city": 0.7, "kind.country": 0.3})
+    assert seen["body"]["state"]["reference_answer"] == "Paris" and seen["body"]["state"]["inputs"] == {"question": "capital of France?"}

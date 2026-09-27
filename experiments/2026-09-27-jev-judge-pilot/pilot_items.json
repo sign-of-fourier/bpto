@@ -1,0 +1,361 @@
+[
+ {
+  "kind": "qa",
+  "key": "qa0",
+  "question": "When did the rock band that sang \"All Join Hands\" rise to prominence? ",
+  "gold": "early 1970s",
+  "pred": "during the early 1970s",
+  "f1": 0.8,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa1",
+  "question": "Who is older Carrie Akre or Shifty Shellshock?",
+  "gold": "Carrie Akre",
+  "pred": "Carrie Akre was born September 24, 1966 and Shifty Shellshock was born August 23, 1974.",
+  "f1": 0.24,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa2",
+  "question": "What comic book does Hershel Greene and Carl Grimes appear in as characters?",
+  "gold": "\"The Walking Dead\"",
+  "pred": "The comic book series 'The Walking Dead'",
+  "f1": 0.57,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa3",
+  "question": "\"The Parasite\" is a kind of text that has how many words?",
+  "gold": "between 7,500 and 40,000",
+  "pred": "7,500 to 40,000",
+  "f1": 0.57,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa4",
+  "question": "Who is Colin Kaepernick and what is his preferred nickname?",
+  "gold": "an American football quarterback",
+  "pred": "Colin Kaepernick is an American football quarterback, and his preferred nickname is 'Kap'.",
+  "f1": 0.4,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa6",
+  "question": "The song \"Medicine\" by The 1975 appears in a film directed by what Danish filmmaker?",
+  "gold": "Nicolas Winding Refn",
+  "pred": "'Drive' (2011 film) directed by Danish filmmaker Nicolas Winding Refn",
+  "f1": 0.46,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa7",
+  "question": "Where did the host of the 2014 edition of the MTV Africa Music Awards begin their career?",
+  "gold": "\"I'm Gonna Git You Sucka\"",
+  "pred": "I'm Gonna Git You Sucka in 1988",
+  "f1": 0.83,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa8",
+  "question": "What other notable role did the star actor from Jeremy perform? ",
+  "gold": "the voice of The Beast",
+  "pred": "the voice of The Beast in the Disney animated film 'Beauty and the Beast' and its numerous sequels and spin-offs",
+  "f1": 0.32,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa9",
+  "question": " Kenneth Anderson served under the General who was which President of the United States?",
+  "gold": "34th",
+  "pred": "General Dwight D. Eisenhower, who served as the 34th President of the United States.",
+  "f1": 0.15,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa10",
+  "question": "What other notable role did the star actor from Jeremy perform? ",
+  "gold": "the voice of The Beast",
+  "pred": "The Beast in Beauty and the Beast",
+  "f1": 0.25,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa11",
+  "question": "Who is older, Jed Hoyer or John William Henry II?",
+  "gold": "John William Henry II",
+  "pred": "John William Henry II born September 13, 1949 is older than Jed Hoyer born December 7, 1973.",
+  "f1": 0.38,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa12",
+  "question": "What video game character did the voice actress in the animated film Alpha and Omega voice?",
+  "gold": "Kairi in the video game series \"Kingdom Hearts\".",
+  "pred": "Kate Higgins voiced Ami Mizuno / Sailor Mercury in the Viz English dub of 'Sailor Moon'.",
+  "f1": 0.1,
+  "label": 0
+ },
+ {
+  "kind": "qa",
+  "key": "qa13",
+  "question": "Hermann Wilhelm G\u00f6ring was a veteran fighter pilot in a war that ended in what year?",
+  "gold": "1918",
+  "pred": "11 November 1918",
+  "f1": 0.5,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa14",
+  "question": "How many years in prison did the Norfolk farmer defended by Anthony Scrivener serve?",
+  "gold": "three",
+  "pred": "three years",
+  "f1": 0.67,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa15",
+  "question": "Between two scientists Ernst Messerschmid and Philippe Perrin, who is older?",
+  "gold": "Ernst Willi Messerschmid",
+  "pred": "Ernst Messerschmid (born May 21, 1945) is older than Philippe Perrin (born January 6, 1963)",
+  "f1": 0.22,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa16",
+  "question": "Who performed on an album named \"Runaljod - Ragnarok\" and a film named \"Flukt\"?",
+  "gold": "Kristian Eivind Espedal",
+  "pred": "Kristian Eivind Espedal (Gaahl)",
+  "f1": 0.86,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa17",
+  "question": "What British rock band released the album Brothers in Arms in 1985 which also featured a song with the same title?",
+  "gold": "Dire Straits",
+  "pred": "the British rock band Dire Straits",
+  "f1": 0.57,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa18",
+  "question": "Which species is the most numerous, Podocarpus or Osmunda? ",
+  "gold": "Podocarpus",
+  "pred": "Podocarpus is the most numerous, Podocarpus or Osmunda",
+  "f1": 0.25,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa19",
+  "question": "Shane and Friends have interviewed an American YouTube personality who has two active YouTube channels, which have a combined total of how many views?",
+  "gold": "1.7 billion",
+  "pred": "1.7 billion views",
+  "f1": 0.8,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa20",
+  "question": "What are both Eleutherococcus and Amaryllis?",
+  "gold": "genus",
+  "pred": "Eleutherococcus is a genus of thorny shrubs and trees; Amaryllis is a genus of flowering bulbs",
+  "f1": 0.13,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa21",
+  "question": "Brad Elterman is a professional photographer who addressed the rock 'n' roll lifestyle of a band that became noted for what?",
+  "gold": "its eclectic mix of musical styles",
+  "pred": "eclectic mix of musical styles incorporating elements of disco, pop, reggae, and early rap music",
+  "f1": 0.48,
+  "label": 1
+ },
+ {
+  "kind": "qa",
+  "key": "qa23",
+  "question": "What professions did S. Sylvan Simon and Danny Cannon have in common?",
+  "gold": "director and producer",
+  "pred": "film director",
+  "f1": 0.4,
+  "label": 0
+ },
+ {
+  "kind": "qa",
+  "key": "qa24",
+  "question": "what species of plants are Chamelaucium and Vanilla derived from?",
+  "gold": "flowers",
+  "pred": "Vanilla: Orchid family (Orchidaceae); Chamelaucium: Myrtle family (Myrtaceae)",
+  "f1": 0.0,
+  "label": 0
+ },
+ {
+  "kind": "qa",
+  "key": "qa25",
+  "question": "Which radioshow did Frank Sinatra appear on the year he won an Academy Award?",
+  "gold": "BBC Radio's \"The Show Band Show\"",
+  "pred": "The Things We Did Last Summer",
+  "f1": 0.0,
+  "label": 0
+ },
+ {
+  "kind": "qa",
+  "key": "qa27",
+  "question": "The southernmost administrative region of Denmark is well-known for creating what products?",
+  "gold": "beer and soft drinks",
+  "pred": "No products",
+  "f1": 0.0,
+  "label": 0
+ },
+ {
+  "kind": "qa",
+  "key": "qa28",
+  "question": "What program did this Basham brother who appeared with World Wrestling Entertainment between 2002 and 2007 participated in 2007?",
+  "gold": "Total Nonstop Action Wrestling",
+  "pred": "2007",
+  "f1": 0.0,
+  "label": 0
+ },
+ {
+  "kind": "qa",
+  "key": "qa29",
+  "question": "Who is Colin Kaepernick and what is his preferred nickname?",
+  "gold": "an American football quarterback",
+  "pred": "Colin Rand Kaepernick, Lopey",
+  "f1": 0.0,
+  "label": 0
+ },
+ {
+  "kind": "qa",
+  "key": "qa30",
+  "question": "John MacGregor, Baron MacGregor of Pulham Market was educated at the University of St Andrews and another university established by what monach?",
+  "gold": "King George IV",
+  "pred": "No monach",
+  "f1": 0.0,
+  "label": 0
+ },
+ {
+  "kind": "qa",
+  "key": "qa31",
+  "question": "Mick Chatterton's best season was in 1969 finishing 16th place for the year in the oldest established what?",
+  "gold": "motorsport world championship",
+  "pred": "motorcycle road race",
+  "f1": 0.0,
+  "label": 0
+ },
+ {
+  "kind": "name",
+  "key": "nm0",
+  "gold": "Bill Gates",
+  "pred": "William Henry Gates III",
+  "label": 1
+ },
+ {
+  "kind": "name",
+  "key": "nm1",
+  "gold": "Dwight D. Eisenhower",
+  "pred": "Ike Eisenhower",
+  "label": 1
+ },
+ {
+  "kind": "name",
+  "key": "nm2",
+  "gold": "J.K. Rowling",
+  "pred": "Joanne Rowling",
+  "label": 1
+ },
+ {
+  "kind": "name",
+  "key": "nm3",
+  "gold": "Mohammed bin Salman",
+  "pred": "MBS",
+  "label": 1
+ },
+ {
+  "kind": "name",
+  "key": "nm4",
+  "gold": "Gaahl",
+  "pred": "Kristian Eivind Espedal",
+  "label": 1
+ },
+ {
+  "kind": "name",
+  "key": "nm5",
+  "gold": "Catherine Zeta-Jones",
+  "pred": "Catherine Zeta Jones",
+  "label": 1
+ },
+ {
+  "kind": "name",
+  "key": "nm6",
+  "gold": "Pyotr Ilyich Tchaikovsky",
+  "pred": "Peter Tchaikovsky",
+  "label": 1
+ },
+ {
+  "kind": "name",
+  "key": "nm7",
+  "gold": "Mao Zedong",
+  "pred": "Mao Tse-tung",
+  "label": 1
+ },
+ {
+  "kind": "name",
+  "key": "nm8",
+  "gold": "Robert Downey Jr.",
+  "pred": "Robert Downey Sr.",
+  "label": 0
+ },
+ {
+  "kind": "name",
+  "key": "nm9",
+  "gold": "George W. Bush",
+  "pred": "George H. W. Bush",
+  "label": 0
+ },
+ {
+  "kind": "name",
+  "key": "nm10",
+  "gold": "John Wesley",
+  "pred": "Charles Wesley",
+  "label": 0
+ },
+ {
+  "kind": "name",
+  "key": "nm11",
+  "gold": "Serena Williams",
+  "pred": "Venus Williams",
+  "label": 0
+ },
+ {
+  "kind": "name",
+  "key": "nm12",
+  "gold": "Martin Luther King Jr.",
+  "pred": "Martin Luther",
+  "label": 0
+ },
+ {
+  "kind": "name",
+  "key": "nm13",
+  "gold": "Elizabeth II",
+  "pred": "Elizabeth I",
+  "label": 0
+ }
+]
