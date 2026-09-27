@@ -17,6 +17,7 @@ from .metrics import Metrics
 from .prompt import Program, Prompt
 
 if TYPE_CHECKING:
+    from .llm.jev import JevClient
     from .task import Task
 
 
@@ -119,6 +120,35 @@ def llm_judge(rubric: str, name: str = "judge", client: ModelClient | None = Non
         comp = await judge.complete(text, config=config, schema=JudgeVerdict)
         v = comp.parsed_as(JudgeVerdict)
         return {name: max(0.0, min(1.0, v.score))}
+    return _score
+
+
+def jev_judge(questions: dict[str, dict], client: "JevClient", *,
+              state: Callable[[Example, Completion], Any] | None = None, config: Any = None) -> Scorer:
+    """Typed-answer judge on Jev: every question in one call, one metric per question (nothing scalarized).
+
+    Build questions with `bpto.llm.jev.noul/choice/score`. Metrics: noul -> P(yes); score -> expected level / top
+    level, in [0, 1]; choice -> `<name>.<label>` = P(label) for every label. `state(example, completion)` is what
+    Jev reads; the default is the example's inputs, `example.answer` as the reference and the output as the answer.
+    Unlike `llm_judge`, `client` is required: the task client is a text model, not Jev.
+    """
+    def _state(example: Example, completion: Completion) -> Any:
+        return {"inputs": example.inputs, "reference_answer": example.answer, "model_answer": completion.text}
+
+    async def _score(prompt, example, completion, ctx):
+        answers = await client.ask((state or _state)(example, completion), questions, config=config)
+        m: Metrics = {}
+        for name, q in questions.items():
+            a = answers[name]
+            if q["type"] == "noul":
+                m[name] = float(a["noul"])
+            elif q["type"] == "score":
+                top = len(q["criteria"]) - 1
+                m[name] = float(a["score"]) / top if top else 1.0
+            else:
+                for label in q["criteria"]:
+                    m[f"{name}.{label}"] = float(a["probabilities"].get(label, 0.0))
+        return m
     return _score
 
 

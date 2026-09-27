@@ -1,0 +1,20 @@
+--- qa
+token F1 (current metric)    n=29 AUC 0.95  acc@.5 0.62  Brier 0.233  distinct 18  rep|Δ| 0.000 flips 0
+Nova Micro llm_judge         n=29 AUC 0.89  acc@.5 0.86  Brier 0.086  distinct  3  rep|Δ| 0.017 flips 0
+Jev noul                     n=29 AUC 1.00  acc@.5 1.00  Brier 0.014  distinct 15  rep|Δ| 0.006 flips 0
+Jev score/3                  n=29 AUC 1.00  acc@.5 1.00  Brier 0.040  distinct 27  rep|Δ| 0.010 flips 0
+--- name
+difflib ratio (string fuzzy) n=14 AUC 0.17  acc@.5 0.43  Brier 0.421  distinct 14  rep|Δ| 0.000 flips 0
+Nova Micro llm_judge         n=14 AUC 0.81  acc@.5 0.79  Brier 0.214  distinct  2  rep|Δ| 0.071 flips 1
+Jev noul                     n=14 AUC 1.00  acc@.5 1.00  Brier 0.002  distinct  7  rep|Δ| 0.001 flips 0
+latency median s: jev 0.16  nova 2.48
+jev tokens in/out per call: 402/29
+
+errors at .5 (label, F1, nova, jev noul, jev score/3):
+qa23 0 0.4 0.5 0.09 0.3466666666666667 | director and producer || film director
+qa24 0 0.0 1.0 0.13 0.21 | flowers || Vanilla: Orchid family (Orchidaceae); Chamelaucium: Myrtle family (Myr
+qa29 0 0.0 1.0 0.18 0.24666666666666667 | an American football quarterback || Colin Rand Kaepernick, Lopey
+qa31 0 0.0 0.5 0.3 0.4066666666666667 | motorsport world championship || motorcycle road race
+nm1 1 None 0.0 0.99 None | Dwight D. Eisenhower || Ike Eisenhower
+nm4 1 None 0.0 0.86 None | Gaahl || Kristian Eivind Espedal
+nm6 1 None 0.0 0.98 None | Pyotr Ilyich Tchaikovsky || Peter Tchaikovsky
