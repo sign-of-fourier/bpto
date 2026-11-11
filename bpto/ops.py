@@ -94,8 +94,10 @@ class Expander(Op):
         return children
 
 
-_WRAP = re.compile(r"^\s*(?:```[a-z]*\s*)?(?:<prompt>\s*)+|(?:\s*</prompt>)+(?:\s*```)?\s*$")
-_TAG = re.compile(r"</?prompt>")
+# <prompt> is the meta-prompt's own delimiter; Nova Lite also wraps rewrites in <template>...</template> (seen live,
+# synthetic_panel 2026-11-11), which otherwise reaches the task model as text.
+_WRAP = re.compile(r"^\s*(?:```[a-z]*\s*)?(?:<(?:prompt|template)>\s*)+|(?:\s*</(?:prompt|template)>)+(?:\s*```)?\s*$")
+_TAG = re.compile(r"</?(?:prompt|template)>")
 
 
 def _strip_wrappers(t: str) -> str:

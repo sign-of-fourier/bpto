@@ -85,6 +85,21 @@ def test_positional_placeholders_are_rejected():
     assert Prompt(template="a {{b}} {text}").placeholders == ("text",)
 
 
+def test_expander_strips_template_tags():
+    """Nova Lite wraps rewrites in <template>...</template>; strip them like <prompt>, and split glued ones."""
+    import asyncio
+    from bpto import Dataset, MockClient, Task, Tree, exact_match, select
+    from bpto.ops import LLMExpander, Variants
+
+    def handler(prompt, cfg, schema):
+        return Variants(prompts=["<template>In your routine {x}\nPrompt: done</template>",
+                                 "```\n<template>\nE {x}\n</template>\n```", "F {x}\n<template>G {x}</template>"])
+    task = Task(root="root {x}", dataset=Dataset.from_records([{"inputs": {"x": 1}, "answer": 1}]), scorer=exact_match(),
+                objective=lambda m, c: (0.0, True), client=MockClient(handler))
+    kids = asyncio.run(Tree(task).apply(LLMExpander(n=4), select.root))
+    assert [k.prompt.template for k in kids] == ["In your routine {x}\nPrompt: done", "E {x}", "F {x}", "G {x}"]
+
+
 def test_expander_splits_glued_templates_and_rejects_repeated_placeholders():
     import asyncio
     from bpto import Dataset, MockClient, Task, Tree, exact_match, select
